@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { describe, it, expect, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { db } from '../src/server/services/dbService';
@@ -202,4 +203,5 @@ describe('Dark Falcon Authentication 2.0 Verification Suite', () => {
     await expect(firebaseAdmin.verifyFirebaseIdToken('fake-unsigned-token')).rejects.toThrow();
   });
 });
+
 
