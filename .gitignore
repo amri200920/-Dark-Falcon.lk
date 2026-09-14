@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.DS_Store
+desktop.ini
+*.log
+*.tsbuildinfo
+.firebase/
+uploads/*
+!uploads/.gitkeep
+npm.cmd
+
+src/server/data/db.json
