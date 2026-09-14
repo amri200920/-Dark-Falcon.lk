@@ -14,7 +14,7 @@ import { socketService } from './services/socketService';
 const app = express();
 const server = http.createServer(app);
 
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 // Allowed CORS origins (Development + Production Firebase Hosting domains)
 const allowedOrigins = [
@@ -81,7 +81,7 @@ app.use(errorHandler);
 socketService.initialize(server);
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`
 🦅 ===================================================
    DARK FALCON SERVER ONLINE
@@ -94,3 +94,5 @@ server.listen(PORT, () => {
 });
 
 export { app, server };
+
+
