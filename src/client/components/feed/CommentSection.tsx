@@ -7,9 +7,10 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface CommentSectionProps {
   postId: string;
+  onOpenProfile?: (username: string) => void;
 }
 
-export const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
+export const CommentSection: React.FC<CommentSectionProps> = ({ postId, onOpenProfile }) => {
   const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -60,10 +61,23 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
         ) : (
           comments.map((c) => (
             <div key={c.id} className="flex items-start gap-2.5 text-xs">
-              <Avatar src={c.userAvatar} alt={c.username} size="xs" />
+              <button
+                type="button"
+                onClick={() => onOpenProfile?.(c.username)}
+                className={onOpenProfile ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}
+                title={onOpenProfile ? `View @${c.username}'s profile` : undefined}
+              >
+                <Avatar src={c.userAvatar} alt={c.username} size="xs" />
+              </button>
               <div className="flex-1 bg-[#090d15] rounded-xl p-2.5 border border-[#1b2438]">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-slate-200">@{c.username}</span>
+                  <button
+                    type="button"
+                    onClick={() => onOpenProfile?.(c.username)}
+                    className={`font-semibold text-slate-200 ${onOpenProfile ? 'hover:text-falcon-blue transition-colors' : ''}`}
+                  >
+                    @{c.username}
+                  </button>
                   <span className="text-[10px] text-slate-500">
                     {new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>

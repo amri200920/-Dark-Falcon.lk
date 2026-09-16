@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
 import { CallType } from '../../shared/types';
@@ -85,6 +85,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const durationTimerRef = useRef<any>(null);
+  // Dedicated MediaStream ref to accumulate remote audio and video tracks
+  const remoteMediaStreamRef = useRef<MediaStream>(new MediaStream());
+  // Queue for ICE candidates arriving before setRemoteDescription completes
+  const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
   // Refs for use in socket closures (avoids ALL stale state captures)
   const activeCallRef = useRef<ActiveCallInfo | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -95,8 +99,24 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
   useEffect(() => { callStateRef.current = callState; }, [callState]);
 
+  const flushIceCandidates = async (pc: RTCPeerConnection) => {
+    if (!pc.remoteDescription) return;
+    while (iceCandidateQueueRef.current.length > 0) {
+      const cand = iceCandidateQueueRef.current.shift();
+      if (cand) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (err) {
+          console.warn('Falcon: Error applying queued ICE candidate:', err);
+        }
+      }
+    }
+  };
+
   const setupPeerConnection = () => {
     if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
+    iceCandidateQueueRef.current = [];
+    remoteMediaStreamRef.current = new MediaStream();
 
     const pc = new RTCPeerConnection({
       iceServers: [
@@ -118,8 +138,27 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     pc.ontrack = (event) => {
-      console.log('Falcon: remote track received', event.streams[0]);
-      if (event.streams && event.streams[0]) setRemoteStream(event.streams[0]);
+      console.log('Falcon: remote track received:', event.track.kind, event.track.id);
+      const streamAccumulator = remoteMediaStreamRef.current;
+
+      if (event.streams && event.streams[0]) {
+        event.streams[0].getTracks().forEach((track) => {
+          if (!streamAccumulator.getTracks().some((t) => t.id === track.id)) {
+            streamAccumulator.addTrack(track);
+          }
+        });
+      } else if (event.track) {
+        if (!streamAccumulator.getTracks().some((t) => t.id === event.track.id)) {
+          streamAccumulator.addTrack(event.track);
+        }
+      }
+
+      event.track.onended = () => {
+        setRemoteStream(new MediaStream(streamAccumulator.getTracks()));
+      };
+
+      // Dispatch a fresh MediaStream instance with all accumulated tracks so React updates
+      setRemoteStream(new MediaStream(streamAccumulator.getTracks()));
     };
 
     pc.onconnectionstatechange = () => {
@@ -190,6 +229,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+        await flushIceCandidates(pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         const call = activeCallRef.current;
@@ -203,17 +243,21 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         if (pc.signalingState === 'have-local-offer') {
           await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+          await flushIceCandidates(pc);
         }
       } catch (err) { console.error('webrtc_answer error:', err); }
     });
 
     const unsubIce = subscribe('ice_candidate', async (payload) => {
       const pc = pcRef.current;
-      if (!pc || !payload.candidate) return;
+      if (!payload.candidate) return;
+      if (!pc || !pc.remoteDescription) {
+        console.log('Falcon: queuing ICE candidate (no remoteDescription yet)');
+        iceCandidateQueueRef.current.push(payload.candidate);
+        return;
+      }
       try {
-        if (pc.remoteDescription) {
-          await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-        }
+        await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
       } catch (e) { console.warn('ICE candidate error:', e); }
     });
 
@@ -234,8 +278,13 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const cleanupMedia = () => {
     stopDurationTimer(); ringtone.stop();
+    iceCandidateQueueRef.current = [];
     const stream = localStreamRef.current;
     if (stream) { stream.getTracks().forEach((t) => t.stop()); setLocalStream(null); localStreamRef.current = null; }
+    if (remoteMediaStreamRef.current) {
+      remoteMediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      remoteMediaStreamRef.current = new MediaStream();
+    }
     setRemoteStream(null);
     if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
     setIsScreenSharing(false); setIsAudioMuted(false); setIsVideoMuted(false);

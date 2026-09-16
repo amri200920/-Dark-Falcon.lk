@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Phone,
   PhoneOff,
@@ -9,6 +9,7 @@ import {
   Monitor,
   Maximize2,
   Sparkles,
+  Volume2,
 } from 'lucide-react';
 import { useCall } from '../../contexts/CallContext';
 import { Avatar } from '../common/Avatar';
@@ -35,6 +36,7 @@ export const CallOverlay: React.FC = () => {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioBlocked, setAudioBlocked] = useState<boolean>(false);
 
   useEffect(() => {
     if (localVideoRef.current && localStream) {
@@ -49,9 +51,13 @@ export const CallOverlay: React.FC = () => {
     // Remote audio track for voice calls (and video calls audio channel)
     if (remoteAudioRef.current && remoteStream) {
       remoteAudioRef.current.srcObject = remoteStream;
-      remoteAudioRef.current.play().catch((err) => {
-        console.warn('Falcon: Remote audio autoplay blocked by policy:', err);
-      });
+      remoteAudioRef.current
+        .play()
+        .then(() => setAudioBlocked(false))
+        .catch((err) => {
+          console.warn('Falcon: Remote audio autoplay blocked by policy:', err);
+          setAudioBlocked(true);
+        });
     }
   }, [remoteStream, activeCall?.type]);
 
@@ -87,7 +93,7 @@ export const CallOverlay: React.FC = () => {
           </h3>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-xs font-semibold mb-6 animate-pulse">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Incoming Dark Falcon {activeCall.type === 'video' ? 'Video' : 'Encrypted Audio'} Call</span>
+            <span>Incoming Dark Falcon {activeCall.type === 'video' ? 'Video' : 'Audio'} Call</span>
           </div>
 
           {/* Call Controls: Reject & Answer */}
@@ -133,8 +139,8 @@ export const CallOverlay: React.FC = () => {
               <p className="text-xs text-falcon-blue font-medium">
                 {callState === 'calling'
                   ? activeCall?.isCaller
-                    ? 'Calling sovereign node...'
-                    : 'Connecting sovereign audio...'
+                    ? 'Calling...'
+                    : 'Connecting...'
                   : callState === 'connected'
                   ? `Connected • ${formatDuration(callDuration)}`
                   : 'Call Ended'}
@@ -144,14 +150,50 @@ export const CallOverlay: React.FC = () => {
         </div>
       </div>
 
+      {/* Audio Autoplay Blocked Floating Recovery Banner */}
+      {audioBlocked && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+          <button
+            onClick={() => {
+              if (remoteAudioRef.current) {
+                remoteAudioRef.current
+                  .play()
+                  .then(() => setAudioBlocked(false))
+                  .catch(console.error);
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-falcon-blue hover:from-cyan-400 hover:to-falcon-blue-light text-white text-xs font-bold rounded-full shadow-neon-blue animate-bounce border border-cyan-300/40"
+          >
+            <Volume2 className="w-4 h-4" />
+            <span>Tap to Enable Audio</span>
+          </button>
+        </div>
+      )}
+
       {/* Main Video / Audio Area */}
       <div className="relative flex-1 flex items-center justify-center overflow-hidden">
-        {/* Remote audio element — always mounted so voice call is heard */}
-        <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
+        {/* Remote audio element — offscreen instead of display:none so mobile OS does not suppress audio */}
+        <audio
+          ref={(el) => {
+            remoteAudioRef.current = el;
+            if (el && remoteStream) {
+              el.srcObject = remoteStream;
+              el.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
+            }
+          }}
+          autoPlay
+          playsInline
+          style={{ position: 'fixed', top: '-100px', left: '-100px', width: '1px', height: '1px', opacity: 0.001, pointerEvents: 'none' }}
+        />
 
         {activeCall?.type === 'video' && remoteStream ? (
           <video
-            ref={remoteVideoRef}
+            ref={(el) => {
+              remoteVideoRef.current = el;
+              if (el && remoteStream) {
+                el.srcObject = remoteStream;
+              }
+            }}
             autoPlay
             playsInline
             className="w-full h-full object-cover"
@@ -172,8 +214,8 @@ export const CallOverlay: React.FC = () => {
             <p className="text-xl font-bold tracking-wide">{activeCall?.targetUsername}</p>
             <span className="text-xs px-3 py-1 rounded-full bg-[#121826] border border-[#1b2438] text-slate-300">
               {callState === 'calling'
-                ? 'Establishing P2P WebRTC Handshake...'
-                : '🛡️ End-to-End Encrypted Sovereign Call'}
+                ? activeCall?.isCaller ? 'Ringing...' : 'Connecting...'
+                : '🛡️ End-to-End Encrypted Call'}
             </span>
           </div>
         )}
@@ -182,7 +224,12 @@ export const CallOverlay: React.FC = () => {
         {activeCall?.type === 'video' && localStream && (
           <div className="absolute bottom-24 right-4 w-32 h-44 sm:w-44 sm:h-60 rounded-2xl overflow-hidden border-2 border-falcon-blue/40 shadow-2xl bg-black z-20">
             <video
-              ref={localVideoRef}
+              ref={(el) => {
+                localVideoRef.current = el;
+                if (el && localStream) {
+                  el.srcObject = localStream;
+                }
+              }}
               autoPlay
               playsInline
               muted

@@ -507,7 +507,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onPostDeleted, onPostU
       </div>
 
       {/* Threaded Comments Section */}
-      {showComments && <CommentSection postId={currentPost.id} />}
+      {showComments && <CommentSection postId={currentPost.id} onOpenProfile={onOpenProfile} />}
 
       {/* Share Modal */}
       <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Sovereign Post" maxWidth="sm">
