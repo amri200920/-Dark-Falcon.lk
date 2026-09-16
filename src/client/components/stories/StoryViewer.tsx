@@ -266,7 +266,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
           {replySuccess ? (
             <div className="flex items-center justify-center gap-1.5 py-2 px-4 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold animate-fade-in">
               <Check className="w-3.5 h-3.5" />
-              <span>Reply sent as sovereign message!</span>
+              <span>Reply sent!</span>
             </div>
           ) : (
             <form onSubmit={handleSendReply} className="flex items-center gap-2">

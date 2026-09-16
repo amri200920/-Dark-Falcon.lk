@@ -33,7 +33,7 @@ export const CallsPage: React.FC = () => {
       <div className="bg-[#0c101a] border border-[#1b2438] rounded-2xl p-4 shadow-sm flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-white">Call History</h2>
-          <p className="text-xs text-slate-400">WebRTC Sovereign Audio & Video Connections</p>
+          <p className="text-xs text-slate-400">Encrypted Audio & Video Calls</p>
         </div>
 
         <div className="flex rounded-xl bg-[#090d15] p-1 border border-[#1b2438] text-xs">
@@ -60,7 +60,7 @@ export const CallsPage: React.FC = () => {
       <div className="bg-[#0c101a] border border-[#1b2438] rounded-2xl divide-y divide-[#1b2438]/50 shadow-sm">
         {filtered.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
-            No call history yet. Start a sovereign voice or video call with any pilot.
+            No call history yet. Start a voice or video call with a contact.
           </div>
         ) : (
           filtered.map((log) => {
