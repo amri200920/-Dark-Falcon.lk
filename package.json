@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "server": "tsx --env-file=.env src/server/server.ts",
-    "start": "tsx --env-file=.env src/server/server.ts",
+    "start": "tsx src/server/server.ts",
     "test": "vitest run",
     "desktop": "electron electron/main.cjs",
     "android:sync": "cap sync android",
@@ -53,4 +53,3 @@
     "vitest": "^3.0.5"
   }
 }
-

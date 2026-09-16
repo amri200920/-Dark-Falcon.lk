@@ -85,6 +85,11 @@ export const App: React.FC = () => {
     setCurrentTab('messages');
   };
 
+  const handleNavigateToProfile = (targetUsername: string) => {
+    setProfileViewUsername(targetUsername);
+    setCurrentTab('profile');
+  };
+
   if (isLoading) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#06080d] text-white select-none">
@@ -178,12 +183,13 @@ export const App: React.FC = () => {
         <HomePage
           onOpenCreatePost={() => setIsCreatePostOpen(true)}
           onNavigateTab={(t) => setCurrentTab(t)}
+          onOpenProfile={handleNavigateToProfile}
         />
       )}
 
-      {currentTab === 'explore' && <ExplorePage />}
+      {currentTab === 'explore' && <ExplorePage onOpenProfile={handleNavigateToProfile} />}
       {currentTab === 'reels' && <ReelsPage />}
-      {currentTab === 'messages' && <MessagesPage />}
+      {currentTab === 'messages' && <MessagesPage onOpenProfile={handleNavigateToProfile} />}
       {currentTab === 'calls' && <CallsPage />}
       {currentTab === 'meetings' && <MeetingsPage />}
       {currentTab === 'communities' && <CommunitiesPage />}

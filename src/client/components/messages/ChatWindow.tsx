@@ -15,12 +15,14 @@ interface ChatWindowProps {
   conversation: Conversation;
   onBack?: () => void;
   onUpdateConversation?: (updated: Conversation) => void;
+  onOpenProfile?: (username: string) => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   conversation,
   onBack,
   onUpdateConversation,
+  onOpenProfile,
 }) => {
   const { user } = useAuth();
   const { sendEvent, subscribe } = useSocket();
@@ -255,7 +257,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       const file = e.target.files[0];
       try {
         const uploadRes = await api.upload(file);
-        if (uploadRes.success) {
+        if (uploadRes.success && uploadRes.data?.url) {
           const type = file.type.startsWith('image/')
             ? 'image'
             : file.type.startsWith('video/')
@@ -273,9 +275,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             },
           });
 
-          if (msgRes.success) {
+          if (msgRes.success && msgRes.data) {
             setMessages((prev) => [...prev, msgRes.data]);
           }
+        } else {
+          throw new Error(uploadRes.message || 'Attachment upload failed to return file URL.');
         }
       } catch (err: any) {
         alert(err.message || 'Failed to upload attachment');
@@ -347,38 +351,56 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               ← Back
             </button>
           )}
-          <Avatar
-            src={conversation.type === 'group' ? conversation.avatarUrl : otherUser?.avatarUrl}
-            alt={title}
-            size="sm"
-            isOnline={conversation.type === 'direct' ? otherUser?.isOnline : undefined}
-          />
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-white leading-tight">{title}</h3>
-              {conversation.type === 'direct' && (
-                <button
-                  type="button"
-                  onClick={() => setE2eeEnabled(!e2eeEnabled)}
-                  className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                    e2eeEnabled && peerPublicKey
-                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                      : 'bg-slate-800 border-slate-700 text-slate-400'
-                  }`}
-                  title={peerPublicKey ? 'Toggle End-to-End Encryption (ECDH P-256 / AES-GCM-256)' : 'Peer public key generating...'}
-                >
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>{e2eeEnabled && peerPublicKey ? '🔒 E2EE' : 'Standard'}</span>
-                </button>
-              )}
+          <div
+            onClick={() => {
+              if (conversation.type === 'direct' && otherUser?.username && onOpenProfile) {
+                onOpenProfile(otherUser.username);
+              }
+            }}
+            className={`flex items-center gap-3 ${
+              conversation.type === 'direct' && otherUser?.username && onOpenProfile
+                ? 'cursor-pointer group'
+                : ''
+            }`}
+            title={conversation.type === 'direct' ? `View @${otherUser?.username}'s profile` : undefined}
+          >
+            <Avatar
+              src={conversation.type === 'group' ? conversation.avatarUrl : otherUser?.avatarUrl}
+              alt={title}
+              size="sm"
+              isOnline={conversation.type === 'direct' ? otherUser?.isOnline : undefined}
+              className="group-hover:ring-2 group-hover:ring-falcon-blue/50 transition-all"
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold text-white leading-tight group-hover:text-falcon-blue transition-colors">{title}</h3>
+                {conversation.type === 'direct' && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setE2eeEnabled(!e2eeEnabled);
+                    }}
+                    className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                      e2eeEnabled && peerPublicKey
+                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400'
+                    }`}
+                    title={peerPublicKey ? 'Toggle End-to-End Encryption (ECDH P-256 / AES-GCM-256)' : 'Peer public key generating...'}
+                  >
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>{e2eeEnabled && peerPublicKey ? '🔒 E2EE' : 'Standard'}</span>
+                  </button>
+                )}
+              </div>
+              <span className="text-[10px] text-slate-400">
+                {conversation.type === 'direct'
+                  ? otherUser?.isOnline
+                    ? '⚡ Active Now'
+                    : 'Offline'
+                  : `${conversation.participants.length} members`}
+              </span>
             </div>
-            <span className="text-[10px] text-slate-400">
-              {conversation.type === 'direct'
-                ? otherUser?.isOnline
-                  ? '⚡ Active Now'
-                  : 'Offline'
-                : `${conversation.participants.length} members`}
-            </span>
           </div>
         </div>
 

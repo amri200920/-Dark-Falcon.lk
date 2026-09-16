@@ -29,42 +29,73 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('falcon_token'));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('falcon_token'));
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const savedUser = localStorage.getItem('falcon_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAppLocked, setIsAppLocked] = useState<boolean>(false);
 
-  // Initialize session
+  // Initialize session — runs ONCE on app startup / page refresh
   useEffect(() => {
     async function initAuth() {
-      if (token) {
+      const storedToken = localStorage.getItem('falcon_token');
+      if (storedToken) {
         try {
           const res = await api.get<User>('/auth/me');
           if (res.success && res.data) {
             setUser(res.data);
+            try {
+              localStorage.setItem('falcon_user', JSON.stringify(res.data));
+            } catch {}
             if (res.data.appLockPinHash) {
-              // Check if app was previously locked
               const lockedState = sessionStorage.getItem('falcon_app_locked');
               if (lockedState === 'true') {
                 setIsAppLocked(true);
               }
             }
           }
-        } catch {
-          logout();
+        } catch (err: any) {
+          // Safe session error handling:
+          // ONLY clear session when the server explicitly confirms that the token is invalid or revoked.
+          const status = err?.status;
+          const code = err?.code;
+          const isExplicitAuthFailure =
+            status === 401 ||
+            code === 'INVALID_TOKEN' ||
+            code === 'TOKEN_REVOKED' ||
+            code === 'USER_NOT_FOUND' ||
+            code === 'AUTH_REQUIRED';
+
+          if (isExplicitAuthFailure) {
+            console.warn('Dark Falcon session expired or rejected by server:', err.message);
+            await logout();
+          } else {
+            // Temporary network timeout, 500, 502, 503, Cloudflare downtime:
+            // Preserve the token and existing user session, allow graceful retry.
+            console.warn('Backend server temporarily unreachable during session verification. Preserving session:', err.message);
+          }
         }
       }
       setIsLoading(false);
     }
     initAuth();
-  }, [token]);
+  }, []); // Run ONCE on mount — prevents login -> /auth/me -> logout loop
 
   const login = async (identifier: string, pass: string) => {
     setIsLoading(true);
     try {
       const res = await api.post('/auth/login', { identifier, password: pass });
-      if (res.success) {
+      if (res.success && res.data) {
         localStorage.setItem('falcon_token', res.data.token);
+        try {
+          localStorage.setItem('falcon_user', JSON.stringify(res.data.user));
+        } catch {}
         setToken(res.data.token);
         setUser(res.data.user);
       }
@@ -77,8 +108,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const res = await api.post('/auth/register', { email, username, displayName, password: pass });
-      if (res.success) {
+      if (res.success && res.data) {
         localStorage.setItem('falcon_token', res.data.token);
+        try {
+          localStorage.setItem('falcon_user', JSON.stringify(res.data.user));
+        } catch {}
         setToken(res.data.token);
         setUser(res.data.user);
       }
@@ -101,8 +135,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.post('/auth/google', { idToken });
       if (res.success && res.data) {
         localStorage.setItem('falcon_token', res.data.token);
+        try {
+          localStorage.setItem('falcon_user', JSON.stringify(res.data.user));
+        } catch {}
         setToken(res.data.token);
         setUser(res.data.user);
+      } else {
+        throw new Error(res.message || 'Failed to authenticate Google session with Dark Falcon server.');
       }
     } finally {
       setIsLoading(false);
@@ -131,6 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } finally {
       localStorage.removeItem('falcon_token');
+      localStorage.removeItem('falcon_user');
       sessionStorage.removeItem('falcon_app_locked');
       setToken(null);
       setUser(null);
@@ -142,6 +182,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await api.put<User>('/users/profile', updates);
     if (res.success) {
       setUser(res.data);
+      try {
+        localStorage.setItem('falcon_user', JSON.stringify(res.data));
+      } catch {}
     }
   };
 

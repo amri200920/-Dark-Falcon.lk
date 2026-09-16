@@ -5,7 +5,11 @@ import { PostCard } from '../components/feed/PostCard';
 import { Post, User, Community, BroadcastChannel } from '../../shared/types';
 import { Avatar } from '../components/common/Avatar';
 
-export const ExplorePage: React.FC = () => {
+interface ExplorePageProps {
+  onOpenProfile?: (username: string) => void;
+}
+
+export const ExplorePage: React.FC<ExplorePageProps> = ({ onOpenProfile }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<{
     users: User[];
@@ -99,15 +103,18 @@ export const ExplorePage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {results.users.map((u) => (
                 <div key={u.id} className="p-3 bg-[#0c101a] border border-[#1b2438] rounded-2xl flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar src={u.avatarUrl} alt={u.displayName} size="md" />
+                  <div
+                    onClick={() => onOpenProfile?.(u.username)}
+                    className="flex items-center gap-3 cursor-pointer group"
+                  >
+                    <Avatar src={u.avatarUrl} alt={u.displayName} size="md" className="group-hover:ring-2 group-hover:ring-falcon-blue/50 transition-all" />
                     <div>
-                      <p className="text-xs font-bold text-white">{u.displayName}</p>
+                      <p className="text-xs font-bold text-white group-hover:text-falcon-blue transition-colors">{u.displayName}</p>
                       <p className="text-[11px] text-slate-400">@{u.username}</p>
                     </div>
                   </div>
                   <button
-                    onClick={() => alert(`View profile @${u.username}`)}
+                    onClick={() => onOpenProfile?.(u.username)}
                     className="px-3 py-1 bg-falcon-blue/15 hover:bg-falcon-blue text-falcon-blue hover:text-white text-xs font-semibold rounded-xl transition-colors"
                   >
                     View

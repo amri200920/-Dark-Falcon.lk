@@ -9,7 +9,11 @@ import { Avatar } from '../components/common/Avatar';
 import { MessageSquare } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-export const MessagesPage: React.FC = () => {
+interface MessagesPageProps {
+  onOpenProfile?: (username: string) => void;
+}
+
+export const MessagesPage: React.FC<MessagesPageProps> = ({ onOpenProfile }) => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConvo, setSelectedConvo] = useState<Conversation | null>(null);
@@ -66,7 +70,7 @@ export const MessagesPage: React.FC = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-5.5rem)] max-w-6xl mx-auto rounded-3xl overflow-hidden border border-[#1b2438] bg-[#0c101a] flex shadow-2xl">
+    <div className="h-full max-w-6xl mx-auto rounded-none md:rounded-3xl overflow-hidden border-0 md:border border-[#1b2438] bg-[#0c101a] flex shadow-2xl">
       {/* Sidebar Chat List */}
       <div className={`${selectedConvo ? 'hidden md:flex' : 'flex'} w-full md:w-80 h-full`}>
         <ChatList
@@ -83,6 +87,7 @@ export const MessagesPage: React.FC = () => {
           <ChatWindow
             conversation={selectedConvo}
             onBack={() => setSelectedConvo(null)}
+            onOpenProfile={onOpenProfile}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">

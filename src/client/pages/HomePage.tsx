@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, TrendingUp, Users, RefreshCw } from 'lucide-react';
+import { Sparkles, TrendingUp, Users } from 'lucide-react';
 import { Post, Story } from '../../shared/types';
 import { api } from '../services/api';
 import { PostCard } from '../components/feed/PostCard';
@@ -13,13 +13,15 @@ import { useAuth } from '../contexts/AuthContext';
 interface HomePageProps {
   onOpenCreatePost: () => void;
   onNavigateTab: (tab: string) => void;
+  onOpenProfile?: (username: string) => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onOpenCreatePost, onNavigateTab }) => {
+export const HomePage: React.FC<HomePageProps> = ({ onOpenCreatePost, onNavigateTab, onOpenProfile }) => {
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [feedTab, setFeedTab] = useState<'forYou' | 'following'>('forYou');
 
   // Story viewer state
   const [selectedStoryIndex, setSelectedStoryIndex] = useState<number | null>(null);
@@ -27,13 +29,17 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenCreatePost, onNavigate
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [feedTab]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
+      const feedEndpoint = feedTab === 'following'
+        ? '/posts/following?limit=25'
+        : '/posts/feed?limit=25';
+
       const [postRes, storyRes] = await Promise.all([
-        api.get<Post[]>('/posts/feed?limit=25'),
+        api.get<Post[]>(feedEndpoint),
         api.get<Story[]>('/stories'),
       ]);
 
@@ -58,6 +64,31 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenCreatePost, onNavigate
     <div className="max-w-6xl mx-auto flex gap-6 pb-20 md:pb-8">
       {/* Center Feed Column */}
       <div className="flex-1 max-w-2xl w-full mx-auto space-y-4">
+        {/* Feed Tab Switcher */}
+        <div className="flex items-center bg-[#0c101a] border border-[#1b2438] rounded-2xl p-1 shadow-sm">
+          <button
+            onClick={() => setFeedTab('forYou')}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+              feedTab === 'forYou'
+                ? 'bg-falcon-blue text-white shadow-neon-blue'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            ✦ For You
+          </button>
+          <button
+            onClick={() => setFeedTab('following')}
+            disabled={!user}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40 ${
+              feedTab === 'following'
+                ? 'bg-falcon-blue text-white shadow-neon-blue'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            👥 Following
+          </button>
+        </div>
+
         {/* 24-Hour Ephemeral Stories Tray */}
         <StoryTray
           stories={stories}
@@ -83,21 +114,57 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenCreatePost, onNavigate
 
         {/* Posts Feed */}
         {isLoading ? (
-          <div className="text-center py-16 text-xs text-slate-500 flex items-center justify-center gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin text-falcon-blue" />
-            <span>Loading Dark Falcon feed...</span>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-[#0c101a] border border-[#1b2438] rounded-2xl p-4 space-y-3">
+                {/* Header skeleton */}
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full skeleton-shimmer flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 w-28 rounded-full skeleton-shimmer" />
+                    <div className="h-2 w-16 rounded-full skeleton-shimmer" />
+                  </div>
+                </div>
+                {/* Content skeleton */}
+                <div className="space-y-2">
+                  <div className="h-3 rounded-full skeleton-shimmer" />
+                  <div className="h-3 w-4/5 rounded-full skeleton-shimmer" />
+                  <div className="h-3 w-3/5 rounded-full skeleton-shimmer" />
+                </div>
+                {/* Image skeleton */}
+                {i === 1 && <div className="h-48 rounded-xl skeleton-shimmer" />}
+                {/* Actions skeleton */}
+                <div className="flex items-center gap-4 pt-1">
+                  {[1, 2, 3].map((j) => (
+                    <div key={j} className="h-6 w-12 rounded-full skeleton-shimmer" />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : posts.length === 0 ? (
           <div className="bg-[#0c101a] border border-[#1b2438] rounded-2xl p-8 text-center text-slate-400">
-            <p className="text-sm font-semibold mb-2">No posts yet in your feed</p>
-            <p className="text-xs text-slate-500 mb-4">Be the first to publish or follow other pilots!</p>
-            <Button variant="glow" size="sm" onClick={onOpenCreatePost}>
-              Create First Post
-            </Button>
+            {feedTab === 'following' ? (
+              <>
+                <p className="text-sm font-semibold mb-2">No posts from people you follow</p>
+                <p className="text-xs text-slate-500 mb-4">Follow more pilots to see their posts here!</p>
+                <Button variant="glow" size="sm" onClick={() => setFeedTab('forYou')}>
+                  Browse For You Feed
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold mb-2">No posts yet in your feed</p>
+                <p className="text-xs text-slate-500 mb-4">Be the first to publish or follow other pilots!</p>
+                <Button variant="glow" size="sm" onClick={onOpenCreatePost}>
+                  Create First Post
+                </Button>
+              </>
+            )}
           </div>
         ) : (
           posts.map((post) => (
-            <PostCard key={post.id} post={post} onPostDeleted={handlePostDeleted} />
+            <PostCard key={post.id} post={post} onPostDeleted={handlePostDeleted} onOpenProfile={onOpenProfile} />
           ))
         )}
       </div>

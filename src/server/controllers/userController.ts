@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import { db } from '../services/dbService';
 import { isFirebaseConfigured } from '../../../firebase/config';
 import { isGeminiConfigured } from '../services/geminiService';
-import { SavedItem, SystemConfigStatus } from '../../shared/types';
+import { SavedItem, SystemConfigStatus, Report } from '../../shared/types';
 import { socketService } from '../services/socketService';
 
 export async function getProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -237,3 +237,29 @@ export async function exportAccountData(req: AuthenticatedRequest, res: Response
   });
 }
 
+// --- User-Submitted Content Reports ---
+export async function submitReport(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const reporter = req.user!;
+  const { targetId, targetType, reason, details } = req.body;
+
+  if (!targetId || !targetType || !reason) {
+    res.status(400).json({ success: false, message: 'targetId, targetType, and reason are required.' });
+    return;
+  }
+
+  const report: Report = {
+    id: `report-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+    reporterId: reporter.id,
+    reporterUsername: reporter.username,
+    targetId,
+    targetType,
+    reason,
+    details: details || '',
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+
+  db.addReport(report);
+
+  res.json({ success: true, message: 'Report submitted. Our moderation team will review it shortly.' });
+}

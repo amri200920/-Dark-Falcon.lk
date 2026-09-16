@@ -57,6 +57,8 @@ export interface User {
   trialEnd?: string;
   verificationStatus?: VerificationStatus;
   subscriptionId?: string;
+  closeFriends?: string[];
+  defaultStoryAudience?: 'everyone' | 'followers' | 'close_friends' | 'selected';
 }
 
 export type PostPrivacy = 'public' | 'followers' | 'close_friends' | 'only_me';
@@ -92,7 +94,7 @@ export interface Post {
   userAvatar?: string;
   content: string;
   mediaUrls: string[];
-  mediaType: 'text' | 'image' | 'video';
+  mediaType: 'text' | 'image' | 'video' | 'carousel';
   privacy: PostPrivacy;
   hashtags: string[];
   mentions: string[];
@@ -105,7 +107,19 @@ export interface Post {
   createdAt: string;
   updatedAt: string;
   isPinned?: boolean;
+  repostOf?: Post;
+  repostUserId?: string;
+  repostUsername?: string;
 }
+
+export interface StorySticker {
+  type: 'emoji' | 'location' | 'mention' | 'poll';
+  content: string;
+  x?: number;
+  y?: number;
+}
+
+export type StoryAudienceType = 'everyone' | 'followers' | 'close_friends' | 'selected';
 
 export interface Story {
   id: string;
@@ -116,10 +130,27 @@ export interface Story {
   mediaType: 'image' | 'video' | 'text';
   textContent?: string;
   backgroundColor?: string;
+  filter?: string;
+  stickers?: StorySticker[];
+  audienceType?: StoryAudienceType;
+  allowedUserIds?: string[];
+  excludedUserIds?: string[];
   viewers: { userId: string; username: string; viewedAt: string }[];
   reactions: Reaction[];
   expiresAt: string;
   createdAt: string;
+}
+
+export interface StoryHighlight {
+  id: string;
+  userId: string;
+  username: string;
+  title: string;
+  coverUrl: string;
+  storyIds: string[];
+  stories?: Story[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface EphemeralStatus {
@@ -144,14 +175,20 @@ export interface ShortVideo {
   caption: string;
   hashtags: string[];
   likesCount: number;
+  likes?: string[]; // userIds who liked
   commentsCount: number;
+  comments?: Comment[];
   sharesCount: number;
   viewsCount: number;
+  filter?: string;
+  audioTitle?: string;
+  audioArtist?: string;
   createdAt: string;
 }
 
 export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'file';
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
+
 
 export interface MessageAttachment {
   url: string;
@@ -292,7 +329,10 @@ export type NotificationType =
   | 'call'
   | 'group_invite'
   | 'community_invite'
-  | 'meeting_invite';
+  | 'meeting_invite'
+  | 'story_reply'
+  | 'story_reaction'
+  | 'repost';
 
 export interface Notification {
   id: string;

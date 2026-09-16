@@ -56,8 +56,28 @@ export const ShortVideoPlayer: React.FC<ShortVideoPlayerProps> = ({ videos }) =>
     }
   };
 
-  const toggleLike = (videoId: string) => {
-    setLikedMap((prev) => ({ ...prev, [videoId]: !prev[videoId] }));
+  const [likesMap, setLikesMap] = useState<Record<string, number>>({});
+  const [isLikingMap, setIsLikingMap] = useState<Record<string, boolean>>({});
+
+  const toggleLike = async (videoId: string) => {
+    if (isLikingMap[videoId]) return;
+    // Optimistic update
+    const wasLiked = likedMap[videoId];
+    setLikedMap((prev) => ({ ...prev, [videoId]: !wasLiked }));
+    setIsLikingMap((prev) => ({ ...prev, [videoId]: true }));
+    try {
+      const res = await api.post<{ liked: boolean; likesCount: number }>(`/videos/${videoId}/like`);
+      if (res.success) {
+        setLikedMap((prev) => ({ ...prev, [videoId]: res.data.liked }));
+        setLikesMap((prev) => ({ ...prev, [videoId]: res.data.likesCount }));
+      }
+    } catch (e) {
+      // Roll back optimistic update on failure
+      setLikedMap((prev) => ({ ...prev, [videoId]: wasLiked }));
+      console.warn('Failed to toggle like', e);
+    } finally {
+      setIsLikingMap((prev) => ({ ...prev, [videoId]: false }));
+    }
   };
 
   const handleToggleSave = async (video: ShortVideo) => {
@@ -89,34 +109,39 @@ export const ShortVideoPlayer: React.FC<ShortVideoPlayerProps> = ({ videos }) =>
     setTimeout(() => setCopiedId(null), 2500);
   };
 
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+
   const openComments = async (video: ShortVideo) => {
     setActiveCommentsVideo(video);
-    setComments([
-      {
-        id: `com-mock-1`,
-        username: 'sovereign_falcon',
-        displayName: 'Falcon Aviator',
-        content: 'Absolute peak energy! Dark Falcon visuals are next-gen ⚡🦅',
-        createdAt: 'Just now',
-      },
-    ]);
+    setComments([]);
+    setIsLoadingComments(true);
+    try {
+      const res = await api.get<any[]>(`/videos/${video.id}/comments`);
+      if (res.success) setComments(res.data);
+    } catch (e) {
+      console.warn('Failed to load comments', e);
+    } finally {
+      setIsLoadingComments(false);
+    }
   };
 
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCommentText.trim() || !user) return;
-
-    const newComment = {
-      id: `com-${Date.now()}`,
-      username: user.username,
-      displayName: user.displayName,
-      avatarUrl: user.avatarUrl,
-      content: newCommentText.trim(),
-      createdAt: 'Just now',
-    };
-
-    setComments((prev) => [newComment, ...prev]);
+    if (!newCommentText.trim() || !user || !activeCommentsVideo) return;
+    const text = newCommentText.trim();
     setNewCommentText('');
+    setIsSubmittingComment(true);
+    try {
+      const res = await api.post<any>(`/videos/${activeCommentsVideo.id}/comments`, { content: text });
+      if (res.success) {
+        setComments((prev) => [res.data, ...prev]);
+      }
+    } catch (e) {
+      console.warn('Failed to add comment', e);
+      setNewCommentText(text); // restore on failure
+    } finally {
+      setIsSubmittingComment(false);
+    }
   };
 
   return (
@@ -183,13 +208,14 @@ export const ShortVideoPlayer: React.FC<ShortVideoPlayerProps> = ({ videos }) =>
               {/* Like */}
               <button
                 onClick={() => toggleLike(video.id)}
-                className="flex flex-col items-center gap-1 text-white hover:scale-110 transition-transform"
+                disabled={isLikingMap[video.id]}
+                className="flex flex-col items-center gap-1 text-white hover:scale-110 active:scale-90 transition-transform disabled:opacity-70"
               >
-                <div className={`p-2.5 rounded-full ${isLiked ? 'bg-red-500/20 text-red-500' : 'bg-black/50 text-white'}`}>
+                <div className={`p-2.5 rounded-full transition-colors ${isLiked ? 'bg-red-500/20 text-red-500 animate-like-pop' : 'bg-black/50 text-white'}`}>
                   <Heart className={`w-6 h-6 ${isLiked ? 'fill-red-500' : ''}`} />
                 </div>
                 <span className="text-[11px] font-bold">
-                  {video.likesCount + (isLiked ? 1 : 0)}
+                  {likesMap[video.id] ?? (video.likesCount + (isLiked ? 1 : 0))}
                 </span>
               </button>
 
@@ -254,7 +280,15 @@ export const ShortVideoPlayer: React.FC<ShortVideoPlayerProps> = ({ videos }) =>
         >
           <div className="flex flex-col h-80">
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-              {comments.length === 0 ? (
+              {isLoadingComments ? (
+                <div className="text-center py-10 text-xs text-slate-500 flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4 animate-spin text-falcon-blue" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                  Loading comments...
+                </div>
+              ) : comments.length === 0 ? (
                 <div className="text-center py-10 text-xs text-slate-500">
                   No comments yet. Start the conversation! 💬
                 </div>

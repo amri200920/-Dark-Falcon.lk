@@ -65,4 +65,33 @@ describe('Dark Falcon Authentication & Session Architecture', () => {
     const userSessions = db.getUserSessions('test-user-1');
     expect(userSessions.some((s) => s.id === 'test-sess-1')).toBe(true);
   });
+
+  it('correctly normalizes and formats Firebase private keys across all environment formats', async () => {
+    const { formatPrivateKey } = await import('../src/server/services/firebaseAdminService');
+
+    // 1. Quoted with literal \n
+    const rawWithEscaped = '"-----BEGIN PRIVATE KEY-----\\nMIIEvgIBADANBgk...\\n-----END PRIVATE KEY-----"';
+    const f1 = formatPrivateKey(rawWithEscaped);
+    expect(f1).toContain('-----BEGIN PRIVATE KEY-----');
+    expect(f1).toContain('-----END PRIVATE KEY-----');
+    expect(f1).not.toContain('\\n');
+    expect(f1.startsWith('"')).toBe(false);
+    expect(f1.endsWith('"')).toBe(false);
+
+    // 2. Pure base64 body without markers
+    const base64Body = Buffer.from('test-raw-key-data').toString('base64');
+    const f2 = formatPrivateKey(base64Body);
+    expect(f2).toContain('-----BEGIN PRIVATE KEY-----');
+    expect(f2).toContain('-----END PRIVATE KEY-----');
+
+    // 3. Nested in JSON string
+    const jsonKey = JSON.stringify({ private_key: '-----BEGIN PRIVATE KEY-----\\nMII...\\n-----END PRIVATE KEY-----' });
+    const f3 = formatPrivateKey(jsonKey);
+    expect(f3).toContain('-----BEGIN PRIVATE KEY-----');
+    expect(f3).not.toContain('\\n');
+
+    // 4. Empty / invalid input
+    expect(formatPrivateKey('')).toBe('');
+    expect(formatPrivateKey(undefined)).toBe('');
+  });
 });

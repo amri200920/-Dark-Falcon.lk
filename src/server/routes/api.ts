@@ -39,6 +39,10 @@ import {
   toggleReaction,
   getComments,
   addComment,
+  editPost,
+  togglePin,
+  repost,
+  getFollowingFeed,
 } from '../controllers/postController';
 import {
   getConversations,
@@ -56,10 +60,19 @@ import {
   getStories,
   createStory,
   viewStory,
+  reactToStory,
+  replyToStory,
+  getUserHighlights,
+  createHighlight,
+  deleteHighlight,
   getStatuses,
   createStatus,
   getShortVideos,
   createShortVideo,
+  likeShortVideo,
+  getVideoComments,
+  addVideoComment,
+  deleteShortVideo,
 } from '../controllers/storyController';
 import {
   getCallLogs,
@@ -107,6 +120,7 @@ import {
   getSystemConfig,
   deleteAccount,
   exportAccountData,
+  submitReport,
 } from '../controllers/userController';
 import {
   requireAuth,
@@ -170,7 +184,12 @@ router.post('/upload', requireAuth, upload.single('file'), (req, res) => {
     res.status(400).json({ success: false, message: 'No file uploaded.' });
     return;
   }
-  const fileUrl = `/uploads/${req.file.filename}`;
+  // Build absolute URL so frontend on a different origin (Firebase Hosting) can load the file
+  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+  const fileUrl = appUrl
+    ? `${appUrl}/uploads/${req.file.filename}`
+    : `/uploads/${req.file.filename}`;
+
   res.json({
     success: true,
     data: {
@@ -181,6 +200,7 @@ router.post('/upload', requireAuth, upload.single('file'), (req, res) => {
     },
   });
 });
+
 
 // --- Auth Routes ---
 router.post('/auth/register', authRateLimiter, register);
@@ -200,9 +220,13 @@ router.post('/auth/recovery/configure', requireAuth, configureRecovery);
 
 // --- Feed & Posts ---
 router.get('/posts/feed', optionalAuth, standardRateLimiter, getFeed);
+router.get('/posts/following', requireAuth, standardRateLimiter, getFollowingFeed);
 router.get('/posts/:id', optionalAuth, getPost);
 router.post('/posts', requireAuth, createPost);
+router.put('/posts/:id', requireAuth, editPost);
 router.delete('/posts/:id', requireAuth, deletePost);
+router.post('/posts/:id/pin', requireAuth, togglePin);
+router.post('/posts/:id/repost', requireAuth, repost);
 router.post('/posts/:id/reactions', requireAuth, toggleReaction);
 router.post('/posts/:id/react', requireAuth, toggleReaction);
 router.get('/posts/:id/comments', optionalAuth, getComments);
@@ -212,10 +236,19 @@ router.post('/posts/:id/comments', requireAuth, addComment);
 router.get('/stories', optionalAuth, getStories);
 router.post('/stories', requireAuth, createStory);
 router.post('/stories/:id/view', requireAuth, viewStory);
+router.post('/stories/:id/react', requireAuth, reactToStory);
+router.post('/stories/:id/reply', requireAuth, replyToStory);
+router.get('/users/:userId/highlights', optionalAuth, getUserHighlights);
+router.post('/highlights', requireAuth, createHighlight);
+router.delete('/highlights/:id', requireAuth, deleteHighlight);
 router.get('/status', optionalAuth, getStatuses);
 router.post('/status', requireAuth, createStatus);
 router.get('/videos', optionalAuth, getShortVideos);
 router.post('/videos', requireAuth, createShortVideo);
+router.post('/videos/:id/like', requireAuth, likeShortVideo);
+router.get('/videos/:id/comments', optionalAuth, getVideoComments);
+router.post('/videos/:id/comments', requireAuth, addVideoComment);
+router.delete('/videos/:id', requireAuth, deleteShortVideo);
 
 // --- Messaging & Groups ---
 router.get('/conversations', requireAuth, getConversations);
@@ -267,6 +300,7 @@ router.get('/search', optionalAuth, searchGlobal);
 router.get('/config/status', getSystemConfig);
 router.delete('/users/account', requireAuth, deleteAccount);
 router.get('/users/data/export', requireAuth, exportAccountData);
+router.post('/reports', requireAuth, submitReport);
 
 // --- Admin & Moderation ---
 router.get('/admin/stats', requireAdmin, getStats);

@@ -205,3 +205,75 @@ export async function addComment(req: AuthenticatedRequest, res: Response): Prom
 
   res.status(201).json({ success: true, data: created });
 }
+
+export async function editPost(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const { content, privacy, location } = req.body;
+  const user = req.user!;
+
+  const updated = db.updatePost(id, user.id, { content, privacy, location });
+  if (!updated) {
+    res.status(404).json({ success: false, message: 'Post not found or unauthorized.' });
+    return;
+  }
+  res.json({ success: true, data: updated, message: 'Post updated successfully.' });
+}
+
+export async function togglePin(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const user = req.user!;
+  const isAdmin = ['admin', 'super_admin'].includes(user.role);
+
+  const updated = db.togglePinPost(id, user.id, isAdmin);
+  if (!updated) {
+    res.status(404).json({ success: false, message: 'Post not found or unauthorized.' });
+    return;
+  }
+  res.json({ success: true, data: updated, message: `Post ${updated.isPinned ? 'pinned' : 'unpinned'} successfully.` });
+}
+
+export async function repost(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const { comment } = req.body;
+  const user = req.user!;
+
+  const reposted = db.repostPost(id, user, comment);
+  if (!reposted) {
+    res.status(404).json({ success: false, message: 'Original post not found.' });
+    return;
+  }
+
+  // Notify original post author if not self
+  if (reposted.repostOf && reposted.repostOf.userId !== user.id) {
+    const notif = db.addNotification({
+      id: `notif-${Date.now()}`,
+      recipientId: reposted.repostOf.userId,
+      actorId: user.id,
+      actorUsername: user.username,
+      actorAvatar: user.avatarUrl,
+      type: 'repost',
+      title: 'Post Reposted',
+      body: `${user.displayName} reposted your post.`,
+      link: `/post/${reposted.id}`,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    });
+    socketService.sendToUser(reposted.repostOf.userId, { type: 'new_notification', payload: notif });
+  }
+
+  res.status(201).json({ success: true, data: reposted, message: 'Reposted successfully.' });
+}
+
+export async function getFollowingFeed(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const limit = parseInt(req.query.limit as string) || 20;
+  const offset = parseInt(req.query.offset as string) || 0;
+  const user = req.user!;
+
+  const posts = db.getFollowingFeed(user.id, limit, offset);
+  res.json({
+    success: true,
+    data: posts,
+    meta: { limit, offset, count: posts.length },
+  });
+}
+

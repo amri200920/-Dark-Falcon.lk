@@ -27,7 +27,95 @@
     background-color: var(--bg-primary);
     color: var(--text-primary);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
+}
+
+/* ═══════════════════════════════════════════════════════
+   LIGHT THEME GLOBAL OVERRIDES
+   Automatically styles Dark Falcon containers, cards,
+   sidebars, headers, and modals when .light is active.
+   ═══════════════════════════════════════════════════════ */
+.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.light .bg-\[\#06080d\] {
+  background-color: #f8fafc !important;
+}
+
+.light .bg-\[\#05070a\] {
+  background-color: #f1f5f9 !important;
+}
+
+.light .bg-\[\#0c101a\] {
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+.light .bg-\[\#121826\] {
+  background-color: #f1f5f9 !important;
+}
+
+.light .bg-\[\#090d15\] {
+  background-color: #f8fafc !important;
+}
+
+.light .bg-\[\#070a10\] {
+  background-color: #ffffff !important;
+}
+
+.light .border-\[\#1b2438\] {
+  border-color: #e2e8f0 !important;
+}
+
+.light .border-\[\#172032\] {
+  border-color: #e2e8f0 !important;
+}
+
+.light .border-\[\#232f48\] {
+  border-color: #cbd5e1 !important;
+}
+
+.light .text-white {
+  color: #0f172a !important;
+}
+
+.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+.light .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.light .hover\:bg-\[\#121826\]:hover {
+  background-color: #e2e8f0 !important;
+}
+
+.light .hover\:bg-\[\#1a2337\]:hover {
+  background-color: #cbd5e1 !important;
+}
+
+.light .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+.light .shadow-falcon-card {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
 }
 
 /* Custom modern scrollbars */
@@ -46,6 +134,16 @@
   background: #00a6ff;
 }
 
+.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #00a6ff;
+}
+
 /* Glowing utilities */
 .glow-blue {
   filter: drop-shadow(0 0 10px rgba(0, 166, 255, 0.5));
@@ -60,6 +158,10 @@
   -webkit-backdrop-filter: blur(16px);
 }
 
+.light .bg-glass {
+  background: rgba(255, 255, 255, 0.85);
+}
+
 .border-glass {
   border-color: rgba(0, 166, 255, 0.15);
 }
@@ -71,4 +173,121 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ═══════════════════════════════════════════════════════
+   PREMIUM MOTION & MICRO-INTERACTION SYSTEM (180-300ms)
+   ═══════════════════════════════════════════════════════ */
+
+/* Smooth page fade-and-rise entrance */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: pageEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Smooth modal zoom-in */
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-enter {
+  animation: modalEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Like Heart Pop */
+@keyframes heartPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); filter: drop-shadow(0 0 8px rgba(0, 166, 255, 0.6)); }
+  75% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+.animate-like-pop {
+  animation: heartPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Falcon Wing Subtle Pulse */
+@keyframes wingPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 166, 255, 0.4); }
+  50% { transform: scale(1.03); box-shadow: 0 0 12px 2px rgba(0, 166, 255, 0.3); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 166, 255, 0); }
+}
+
+.animate-falcon-pulse {
+  animation: wingPulse 0.4s ease-out;
+}
+
+/* Shimmer Skeleton Loader */
+@keyframes skeletonShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(27, 36, 56, 0.3) 25%, rgba(0, 166, 255, 0.08) 50%, rgba(27, 36, 56, 0.3) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.8s infinite;
+}
+
+/* Message Bubble Entrance — slides in from side */
+@keyframes messageBubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-message-in {
+  animation: messageBubbleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Bottom Nav Active Icon Glow */
+@keyframes navIconGlow {
+  0%   { filter: drop-shadow(0 0 0px rgba(0, 166, 255, 0)); }
+  50%  { filter: drop-shadow(0 0 8px rgba(0, 166, 255, 0.75)); }
+  100% { filter: drop-shadow(0 0 5px rgba(0, 166, 255, 0.55)); }
+}
+
+.nav-icon-active {
+  filter: drop-shadow(0 0 5px rgba(0, 166, 255, 0.55));
+  animation: navIconGlow 0.4s ease-out forwards;
+}
+
+/* Story progress bar active track glow */
+.story-progress-active {
+  background: linear-gradient(90deg, #00a6ff, #00d4ff);
+  box-shadow: 0 0 6px 1px rgba(0, 166, 255, 0.6);
+}
+
+/* Respect Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

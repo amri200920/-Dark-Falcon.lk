@@ -11,6 +11,7 @@ import { Button } from '../components/common/Button';
 import { Modal } from '../components/common/Modal';
 import { Input } from '../components/common/Input';
 import { PostCard } from '../components/feed/PostCard';
+import { StoryHighlights } from '../components/stories/StoryHighlights';
 
 interface ProfilePageProps {
   username?: string;
@@ -154,7 +155,47 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ username, onOpenDirect
   };
 
   if (!profileUser) {
-    return <div className="text-center py-16 text-xs text-slate-500">Loading sovereign profile...</div>;
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 pb-20 md:pb-8 animate-page-enter">
+        {/* Profile Card Skeleton */}
+        <div className="bg-[#0c101a] border border-[#1b2438] rounded-3xl overflow-hidden shadow-2xl">
+          {/* Cover skeleton */}
+          <div className="h-44 sm:h-56 skeleton-shimmer" />
+          <div className="px-5 pb-5">
+            {/* Avatar + actions row */}
+            <div className="flex items-end justify-between -mt-12 mb-4">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-[#0c101a] skeleton-shimmer flex-shrink-0" />
+              <div className="flex gap-2 mt-4">
+                <div className="h-8 w-24 rounded-xl skeleton-shimmer" />
+                <div className="h-8 w-8 rounded-xl skeleton-shimmer" />
+              </div>
+            </div>
+            {/* Name / handle */}
+            <div className="space-y-2 mb-4">
+              <div className="h-5 w-40 rounded-full skeleton-shimmer" />
+              <div className="h-3 w-24 rounded-full skeleton-shimmer" />
+              <div className="h-3 w-64 rounded-full skeleton-shimmer" />
+              <div className="h-3 w-48 rounded-full skeleton-shimmer" />
+            </div>
+            {/* Stats row */}
+            <div className="flex gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-1">
+                  <div className="h-4 w-8 rounded-full skeleton-shimmer" />
+                  <div className="h-2 w-14 rounded-full skeleton-shimmer" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Post grid skeleton */}
+        <div className="grid grid-cols-3 gap-1">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="aspect-square skeleton-shimmer rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -243,13 +284,16 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ username, onOpenDirect
                     variant={isFollowing ? 'secondary' : 'glow'}
                     size="sm"
                     onClick={toggleFollow}
+                    className="transition-all duration-200 active:scale-95"
                   >
                     {isFollowing ? (
-                      <>
+                      <span className="flex items-center gap-1.5 animate-falcon-pulse">
                         <Check className="w-4 h-4 text-emerald-400" /> Following
-                      </>
+                      </span>
                     ) : (
-                      'Follow'
+                      <span className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-falcon-blue" /> Follow
+                      </span>
                     )}
                   </Button>
                   {onOpenDirectChat && (
@@ -332,6 +376,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ username, onOpenDirect
           </div>
         </div>
       </div>
+
+      {/* Profile Story Highlights */}
+      <StoryHighlights userId={profileUser.id} isSelf={Boolean(isSelf)} />
 
       {/* User's Posts Feed */}
       <div className="space-y-4">

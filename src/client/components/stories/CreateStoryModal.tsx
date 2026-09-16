@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Image, Type, Palette } from 'lucide-react';
+import { Image, Type, Palette, Wand2, Smile } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
-import { Story } from '../../../shared/types';
+import { Story, StorySticker, StoryAudienceType } from '../../../shared/types';
+import { CINEMATIC_FILTERS, getFilterCss } from '../../../shared/constants';
 import { api } from '../../services/api';
 
 interface CreateStoryModalProps {
@@ -12,6 +13,7 @@ interface CreateStoryModalProps {
 }
 
 const BG_COLORS = ['#0c101a', '#00477a', '#0072b8', '#3b0764', '#1e1b4b', '#14532d', '#701a75'];
+const QUICK_STICKERS = ['🔥', '🦅', '⚡', '👑', '🚀', '❤️', '💯', '🌟'];
 
 export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({
   isOpen,
@@ -23,6 +25,9 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({
   const [bgColor, setBgColor] = useState(BG_COLORS[1]);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState('original');
+  const [selectedStickers, setSelectedStickers] = useState<StorySticker[]>([]);
+  const [audienceType, setAudienceType] = useState<StoryAudienceType>('followers');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -35,6 +40,13 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({
     }
   };
 
+  const handleAddSticker = (emoji: string) => {
+    setSelectedStickers((prev) => [
+      ...prev,
+      { type: 'emoji', content: emoji, x: Math.random() * 60 + 20, y: Math.random() * 60 + 20 },
+    ]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -42,7 +54,15 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({
       let mediaUrl = '';
       if (mediaFile) {
         const uploadRes = await api.upload(mediaFile);
-        if (uploadRes.success) mediaUrl = uploadRes.data.url;
+        if (uploadRes.success && uploadRes.data?.url) {
+          mediaUrl = uploadRes.data.url;
+        } else {
+          throw new Error(uploadRes.message || 'Media upload failed. Please try again.');
+        }
+      }
+
+      if (type === 'image' && !mediaUrl) {
+        throw new Error('Please select an image or video to upload.');
       }
 
       const res = await api.post<Story>('/stories', {
@@ -50,6 +70,9 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({
         mediaUrl,
         textContent: text,
         backgroundColor: bgColor,
+        filter: selectedFilter,
+        stickers: selectedStickers,
+        audienceType,
       });
 
       if (res.success && res.data) {
@@ -57,6 +80,8 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({
         setText('');
         setMediaFile(null);
         setMediaPreview(null);
+        setSelectedFilter('original');
+        setSelectedStickers([]);
         onClose();
       }
     } catch (e: any) {
@@ -138,20 +163,132 @@ export const CreateStoryModal: React.FC<CreateStoryModalProps> = ({
 
         {/* Image Story Preview */}
         {type === 'image' && (
-          <div className="relative w-full h-52 rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-[#1b2438]">
-            {mediaPreview ? (
-              <img src={mediaPreview} alt="Story preview" className="w-full h-full object-cover" />
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="text-xs text-falcon-blue hover:underline"
-              >
-                Click to choose image or video
-              </button>
+          <div className="space-y-3">
+            <div className="relative w-full h-56 rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-[#1b2438]">
+              {mediaPreview ? (
+                mediaFile?.type.startsWith('video') ? (
+                  <video
+                    src={mediaPreview}
+                    controls
+                    className="w-full h-full object-contain"
+                    style={{ filter: getFilterCss(selectedFilter) }}
+                  />
+                ) : (
+                  <img
+                    src={mediaPreview}
+                    alt="Story preview"
+                    className="w-full h-full object-cover transition-all"
+                    style={{ filter: getFilterCss(selectedFilter) }}
+                  />
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="text-xs text-falcon-blue hover:underline"
+                >
+                  Click to choose image or video
+                </button>
+              )}
+
+              {/* Render Selected Stickers on Top */}
+              {selectedStickers.map((stk, idx) => (
+                <span
+                  key={idx}
+                  className="absolute text-2xl select-none pointer-events-none drop-shadow-md"
+                  style={{ top: `${stk.y}%`, left: `${stk.x}%` }}
+                >
+                  {stk.content}
+                </span>
+              ))}
+            </div>
+
+            {/* Visual Filters Selector */}
+            {mediaPreview && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs text-slate-300 font-semibold">
+                  <Wand2 className="w-3.5 h-3.5 text-falcon-blue" />
+                  <span>Cinematic Filter</span>
+                </div>
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                  {CINEMATIC_FILTERS.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setSelectedFilter(f.id)}
+                      className={`px-3 py-1 rounded-xl text-xs whitespace-nowrap transition-all border ${
+                        selectedFilter === f.id
+                          ? 'bg-falcon-blue text-white border-falcon-blue font-bold shadow-neon-blue'
+                          : 'bg-[#090d15] text-slate-400 border-[#1b2438] hover:text-white'
+                      }`}
+                    >
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Quick Stickers */}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <Smile className="w-3 h-3 text-amber-400" /> Tap to add sticker:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {QUICK_STICKERS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => handleAddSticker(emoji)}
+                        className="text-base hover:scale-125 active:scale-95 transition-transform"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
+
+        {/* Story Privacy / Audience Selector */}
+        <div className="space-y-1.5 pt-1">
+          <label className="text-[11px] font-semibold text-slate-300">Who can see this story?</label>
+          <div className="grid grid-cols-3 gap-1.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setAudienceType('followers')}
+              className={`py-1.5 px-2 rounded-xl border text-[11px] font-medium transition-all ${
+                audienceType === 'followers'
+                  ? 'bg-falcon-blue/20 border-falcon-blue text-falcon-blue font-bold shadow-neon-blue'
+                  : 'bg-[#090d15] border-[#1b2438] text-slate-400 hover:text-white'
+              }`}
+            >
+              👥 Followers
+            </button>
+            <button
+              type="button"
+              onClick={() => setAudienceType('close_friends')}
+              className={`py-1.5 px-2 rounded-xl border text-[11px] font-medium transition-all ${
+                audienceType === 'close_friends'
+                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold'
+                  : 'bg-[#090d15] border-[#1b2438] text-slate-400 hover:text-white'
+              }`}
+            >
+              ⭐ Close Friends
+            </button>
+            <button
+              type="button"
+              onClick={() => setAudienceType('everyone')}
+              className={`py-1.5 px-2 rounded-xl border text-[11px] font-medium transition-all ${
+                audienceType === 'everyone'
+                  ? 'bg-purple-500/20 border-purple-500 text-purple-300 font-bold'
+                  : 'bg-[#090d15] border-[#1b2438] text-slate-400 hover:text-white'
+              }`}
+            >
+              🌍 Everyone
+            </button>
+          </div>
+        </div>
 
         <Button
           type="submit"

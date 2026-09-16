@@ -22,6 +22,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   unreadNotificationsCount = 0,
   children,
 }) => {
+  // In messages tab, the ChatWindow manages its own full-height layout.
+  // Remove outer padding and hide BottomNav on mobile to avoid covering the composer.
+  const isMessages = currentTab === 'messages';
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#06080d] text-slate-100">
       {/* Desktop Collapsible Sidebar */}
@@ -43,18 +47,25 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           unreadMessagesCount={unreadMessagesCount}
         />
 
-        {/* Dynamic Page Content */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6 no-scrollbar">
+        {/* Dynamic Page Content — no padding or scroll in messages mode (ChatWindow manages its own) */}
+        <main
+          key={currentTab}
+          className={`flex-1 no-scrollbar animate-page-enter ${isMessages ? 'overflow-hidden' : 'overflow-y-auto p-3 sm:p-6'}`}
+        >
           {children}
         </main>
 
-        {/* Mobile Navigation Bar */}
-        <BottomNav
-          currentTab={currentTab}
-          onSelectTab={onSelectTab}
-          onOpenCreate={onOpenCreate}
-          unreadMessagesCount={unreadMessagesCount}
-        />
+        {/* Mobile Navigation Bar — hidden in messages tab to avoid covering the composer.
+            ChatWindow has its own ← Back button to return to the chat list. */}
+        {!isMessages && (
+          <BottomNav
+            currentTab={currentTab}
+            onSelectTab={onSelectTab}
+            onOpenCreate={onOpenCreate}
+            unreadMessagesCount={unreadMessagesCount}
+          />
+        )}
+
       </div>
 
       {/* Real-time WebRTC Audio & Video Calling Overlay */}
@@ -65,3 +76,4 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     </div>
   );
 };
+

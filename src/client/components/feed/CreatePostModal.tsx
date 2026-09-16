@@ -20,24 +20,30 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 }) => {
   const { user } = useAuth();
   const [content, setContent] = useState('');
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   const [privacy, setPrivacy] = useState<PostPrivacy>('public');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAILoading, setIsAILoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setMediaFile(file);
-      setMediaPreview(URL.createObjectURL(file));
+    if (e.target.files) {
+      const selected = Array.from(e.target.files);
+      setMediaFiles((prev) => [...prev, ...selected]);
+      const newPreviews = selected.map((f) => URL.createObjectURL(f));
+      setMediaPreviews((prev) => [...prev, ...newPreviews]);
     }
   };
 
-  const removeMedia = () => {
-    setMediaFile(null);
-    setMediaPreview(null);
+  const removeMedia = (idx: number) => {
+    setMediaFiles((prev) => prev.filter((_, i) => i !== idx));
+    setMediaPreviews((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const clearAllMedia = () => {
+    setMediaFiles([]);
+    setMediaPreviews([]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -73,28 +79,27 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() && !mediaFile) return;
+    if (!content.trim() && mediaFiles.length === 0) return;
 
     setIsSubmitting(true);
     try {
-      let mediaUrls: string[] = [];
-      if (mediaFile) {
-        const uploadRes = await api.upload(mediaFile);
-        if (uploadRes.success && uploadRes.data?.url) {
-          mediaUrls.push(uploadRes.data.url);
-        }
-      }
+      const uploadPromises = mediaFiles.map((file) => api.upload(file));
+      const uploadResults = await Promise.all(uploadPromises);
+      const mediaUrls = uploadResults
+        .filter((r) => r.success && r.data?.url)
+        .map((r) => r.data.url);
 
       const res = await api.post<Post>('/posts', {
         content: content.trim(),
         mediaUrls,
+        mediaType: mediaUrls.length > 1 ? 'carousel' : mediaUrls.length === 1 ? (mediaUrls[0].endsWith('.mp4') ? 'video' : 'image') : 'text',
         privacy,
       });
 
       if (res.success && res.data) {
         onPostCreated(res.data);
         setContent('');
-        removeMedia();
+        clearAllMedia();
         onClose();
       }
     } catch (err: any) {
@@ -138,21 +143,28 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           className="w-full bg-[#090d15] border border-[#1b2438] rounded-xl p-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-falcon-blue resize-none"
         />
 
-        {/* Media Preview if attached */}
-        {mediaPreview && (
-          <div className="relative rounded-xl overflow-hidden border border-[#1b2438] bg-black max-h-60 flex items-center justify-center">
-            {mediaFile?.type.startsWith('video') ? (
-              <video src={mediaPreview} controls className="max-h-60 w-full object-contain" />
-            ) : (
-              <img src={mediaPreview} alt="Upload preview" className="max-h-60 w-full object-cover" />
-            )}
-            <button
-              type="button"
-              onClick={removeMedia}
-              className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 hover:bg-black text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
+        {/* Media Previews Grid */}
+        {mediaPreviews.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto p-1 bg-black/40 rounded-xl border border-[#1b2438]">
+            {mediaPreviews.map((preview, idx) => {
+              const isVideo = mediaFiles[idx]?.type.startsWith('video');
+              return (
+                <div key={idx} className="relative rounded-lg overflow-hidden border border-[#1b2438] bg-black h-28 flex items-center justify-center group">
+                  {isVideo ? (
+                    <video src={preview} className="h-full w-full object-cover" />
+                  ) : (
+                    <img src={preview} alt="Upload preview" className="h-full w-full object-cover" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeMedia(idx)}
+                    className="absolute top-1 right-1 p-1 rounded-full bg-black/75 hover:bg-red-600 text-white transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -183,6 +195,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept="image/*,video/*"
             onChange={handleMediaSelect}
             className="hidden"
@@ -192,14 +205,14 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-falcon-blue transition-colors px-2 py-1"
           >
-            <Image className="w-4 h-4" /> Add Photo/Video
+            <Image className="w-4 h-4" /> Add Photos/Videos {mediaFiles.length > 0 && `(${mediaFiles.length})`}
           </button>
 
           <Button
             type="submit"
             variant="glow"
             isLoading={isSubmitting}
-            disabled={!content.trim() && !mediaFile}
+            disabled={!content.trim() && mediaFiles.length === 0}
           >
             Publish Post
           </Button>

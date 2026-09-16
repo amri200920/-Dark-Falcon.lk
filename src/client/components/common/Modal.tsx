@@ -43,7 +43,7 @@ export const Modal: React.FC<ModalProps> = ({
       />
       {/* Modal Card */}
       <div
-        className={`relative w-full ${maxWidthStyles[maxWidth]} bg-[#0c101a] border border-[#1b2438] rounded-2xl shadow-2xl p-6 overflow-hidden z-10 animate-fade-in`}
+        className={`relative w-full ${maxWidthStyles[maxWidth]} bg-[#0c101a] border border-[#1b2438] rounded-2xl shadow-2xl p-6 overflow-hidden z-10 animate-modal-enter`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pb-4 border-b border-[#1b2438]/80 mb-4">

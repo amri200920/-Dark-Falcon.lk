@@ -47,7 +47,22 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+
+      // Detect best supported MIME type for cross-browser/mobile compatibility
+      const PREFERRED_TYPES = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/mpeg',
+      ];
+      const mimeType = PREFERRED_TYPES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      const actualMimeType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -68,13 +83,14 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        // Use the actual mimeType the recorder used for the Blob
+        const blob = new Blob(audioChunksRef.current, { type: actualMimeType });
         setRecordedBlob(blob);
         setRecordedUrl(URL.createObjectURL(blob));
         stream.getTracks().forEach((track) => track.stop());
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(250); // collect data every 250ms for reliability
       setIsRecording(true);
 
       setDuration(0);
@@ -83,6 +99,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
       }, 1000);
     } catch (err: any) {
       alert(`Microphone permission error: ${err.message || 'Microphone unavailable'}`);
+
       onCancel();
     }
   };
@@ -147,14 +164,18 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
     if (!recordedBlob) return;
     setIsUploading(true);
     try {
-      const file = new File([recordedBlob], `voice-note-${Date.now()}.webm`, {
-        type: 'audio/webm',
+      const mime = recordedBlob.type || 'audio/webm';
+      const ext = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : mime.includes('mpeg') ? 'mp3' : 'webm';
+      const file = new File([recordedBlob], `voice-note-${Date.now()}.${ext}`, {
+        type: mime,
       });
       const res = await api.upload(file);
       if (res.success && res.data?.url) {
         // Generate pseudo-random waveform representation
         const waveform = Array.from({ length: 24 }, () => Math.floor(Math.random() * 80) + 20);
         onSendVoiceNote(res.data.url, duration, waveform);
+      } else {
+        throw new Error(res.message || 'Upload failed');
       }
     } catch (e: any) {
       alert('Failed to send audio note: ' + e.message);

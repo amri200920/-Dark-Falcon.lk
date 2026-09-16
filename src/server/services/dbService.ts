@@ -8,6 +8,7 @@ import {
   Comment,
   Reaction,
   Story,
+  StoryHighlight,
   EphemeralStatus,
   ShortVideo,
   Conversation,
@@ -33,6 +34,7 @@ interface DatabaseSchema {
   posts: Post[];
   comments: Comment[];
   stories: Story[];
+  highlights: StoryHighlight[];
   statuses: EphemeralStatus[];
   shortVideos: ShortVideo[];
   conversations: Conversation[];
@@ -78,7 +80,9 @@ class DatabaseService {
     try {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (!parsed.highlights) parsed.highlights = [];
+        return parsed;
       }
     } catch (err) {
       console.error('Failed to parse db.json, initializing fresh store:', err);
@@ -90,6 +94,7 @@ class DatabaseService {
       posts: [],
       comments: [],
       stories: [],
+      highlights: [],
       statuses: [],
       shortVideos: [],
       conversations: [],
@@ -112,16 +117,15 @@ class DatabaseService {
     };
   }
 
-  public persist() {
-    if (this.saveTimeout) clearTimeout(this.saveTimeout);
-    this.saveTimeout = setTimeout(() => {
-      try {
-        fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
-      } catch (err) {
-        console.error('Error persisting database to disk:', err);
-      }
-    }, 150);
+public persist() {
+  if (this.saveTimeout) clearTimeout(this.saveTimeout);
+
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error persisting database to disk:', err);
   }
+}
 
   private seedDefaultsIfEmpty() {
     if (this.data.users.length === 0) {
@@ -675,6 +679,77 @@ class DatabaseService {
     return post;
   }
 
+  public getFollowingFeed(currentUserId: string, limit = 20, offset = 0): Post[] {
+    const followingIds = new Set(
+      this.data.follows.filter((f) => f.followerId === currentUserId).map((f) => f.followingId)
+    );
+    followingIds.add(currentUserId);
+
+    const filtered = this.data.posts
+      .filter((p) => followingIds.has(p.userId))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return filtered.slice(offset, offset + limit);
+  }
+
+  public updatePost(postId: string, userId: string, updates: Partial<Post>): Post | null {
+    const post = this.getPostById(postId);
+    if (!post || post.userId !== userId) return null;
+    if (updates.content !== undefined) post.content = updates.content;
+    if (updates.privacy !== undefined) post.privacy = updates.privacy;
+    if (updates.location !== undefined) post.location = updates.location;
+    post.updatedAt = new Date().toISOString();
+    this.persist();
+    return post;
+  }
+
+  public togglePinPost(postId: string, userId: string, isAdmin = false): Post | null {
+    const post = this.getPostById(postId);
+    if (!post) return null;
+    if (post.userId !== userId && !isAdmin) return null;
+    post.isPinned = !post.isPinned;
+    post.updatedAt = new Date().toISOString();
+    this.persist();
+    return post;
+  }
+
+  public repostPost(originalPostId: string, user: User, quoteComment?: string): Post | null {
+    const originalPost = this.getPostById(originalPostId);
+    if (!originalPost) return null;
+
+    originalPost.sharesCount = (originalPost.sharesCount || 0) + 1;
+
+    const repost: Post = {
+      id: `repost-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      userId: user.id,
+      username: user.username,
+      userDisplayName: user.displayName,
+      userAvatar: user.avatarUrl,
+      content: quoteComment || '',
+      mediaUrls: originalPost.mediaUrls || [],
+      mediaType: originalPost.mediaType || 'text',
+      privacy: 'public',
+      hashtags: originalPost.hashtags || [],
+      mentions: originalPost.mentions || [],
+      likesCount: 0,
+      commentsCount: 0,
+      reactions: [],
+      sharesCount: 0,
+      savesCount: 0,
+      repostOf: originalPost,
+      repostUserId: user.id,
+      repostUsername: user.username,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.data.posts.unshift(repost);
+    const dbUser = this.findUserById(user.id);
+    if (dbUser && dbUser.postsCount !== undefined) dbUser.postsCount += 1;
+    this.persist();
+    return repost;
+  }
+
   // --- Comments ---
   public getPostComments(postId: string): Comment[] {
     return this.data.comments
@@ -691,9 +766,56 @@ class DatabaseService {
   }
 
   // --- Stories (24h Ephemeral) ---
-  public getActiveStories(): Story[] {
+  public getActiveStories(viewerUserId?: string): Story[] {
     const now = new Date().getTime();
-    return this.data.stories.filter((s) => new Date(s.expiresAt).getTime() > now);
+    const active = this.data.stories.filter((s) => new Date(s.expiresAt).getTime() > now);
+    
+    // If no viewer or viewer not logged in, only show public 'everyone' stories
+    return active.filter((story) => {
+      // Story creator can always see their own story
+      if (viewerUserId && story.userId === viewerUserId) {
+        return true;
+      }
+
+      // Check if viewer is blocked by or has blocked the story creator
+      if (viewerUserId && this.isBlocked(viewerUserId, story.userId)) {
+        return false;
+      }
+
+      // Check if viewer is explicitly excluded ("Hide Story From")
+      if (viewerUserId && story.excludedUserIds && story.excludedUserIds.includes(viewerUserId)) {
+        return false;
+      }
+
+      const audience = story.audienceType || 'everyone';
+
+      if (audience === 'everyone') {
+        return true;
+      }
+
+      // All restricted audiences require a logged-in viewer
+      if (!viewerUserId) {
+        return false;
+      }
+
+      if (audience === 'followers') {
+        // Viewer must follow the story author
+        return this.isFollowing(viewerUserId, story.userId);
+      }
+
+      if (audience === 'close_friends') {
+        // Viewer must be in the creator's close friends list
+        const creator = this.findUserById(story.userId);
+        return Boolean(creator?.closeFriends && creator.closeFriends.includes(viewerUserId));
+      }
+
+      if (audience === 'selected') {
+        // Viewer must be in the explicitly allowed list
+        return Boolean(story.allowedUserIds && story.allowedUserIds.includes(viewerUserId));
+      }
+
+      return false;
+    });
   }
 
   public createStory(story: Story): Story {
@@ -709,6 +831,50 @@ class DatabaseService {
       story.viewers.push({ userId, username, viewedAt: new Date().toISOString() });
       this.persist();
     }
+    return true;
+  }
+
+  public addStoryReaction(storyId: string, reaction: Reaction): Story | null {
+    const story = this.data.stories.find((s) => s.id === storyId);
+    if (!story) return null;
+    if (!story.reactions) story.reactions = [];
+    const idx = story.reactions.findIndex((r) => r.userId === reaction.userId);
+    if (idx > -1) {
+      story.reactions[idx] = reaction;
+    } else {
+      story.reactions.push(reaction);
+    }
+    this.persist();
+    return story;
+  }
+
+  public getUserHighlights(userId: string): StoryHighlight[] {
+    if (!this.data.highlights) this.data.highlights = [];
+    return this.data.highlights
+      .filter((h) => h.userId === userId)
+      .map((h) => ({
+        ...h,
+        stories: (h.storyIds || [])
+          .map((id) => this.data.stories.find((s) => s.id === id))
+          .filter(Boolean) as Story[],
+      }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  public createHighlight(highlight: StoryHighlight): StoryHighlight {
+    if (!this.data.highlights) this.data.highlights = [];
+    this.data.highlights.unshift(highlight);
+    this.persist();
+    return highlight;
+  }
+
+  public deleteHighlight(highlightId: string, userId: string): boolean {
+    if (!this.data.highlights) return false;
+    const index = this.data.highlights.findIndex((h) => h.id === highlightId);
+    if (index === -1) return false;
+    if (this.data.highlights[index].userId !== userId) return false;
+    this.data.highlights.splice(index, 1);
+    this.persist();
     return true;
   }
 
@@ -736,6 +902,51 @@ class DatabaseService {
     this.persist();
     return video;
   }
+
+  public toggleShortVideoLike(videoId: string, userId: string): { video: ShortVideo; isLiked: boolean } | null {
+    const video = this.data.shortVideos.find((v) => v.id === videoId);
+    if (!video) return null;
+    if (!video.likes) video.likes = [];
+    const idx = video.likes.indexOf(userId);
+    let isLiked = false;
+    if (idx > -1) {
+      video.likes.splice(idx, 1);
+      video.likesCount = Math.max(0, (video.likesCount || 0) - 1);
+      isLiked = false;
+    } else {
+      video.likes.push(userId);
+      video.likesCount = (video.likesCount || 0) + 1;
+      isLiked = true;
+    }
+    this.persist();
+    return { video, isLiked };
+  }
+
+  public getShortVideoComments(videoId: string): Comment[] {
+    const video = this.data.shortVideos.find((v) => v.id === videoId);
+    return video?.comments || [];
+  }
+
+  public addShortVideoComment(videoId: string, comment: Comment): Comment | null {
+    const video = this.data.shortVideos.find((v) => v.id === videoId);
+    if (!video) return null;
+    if (!video.comments) video.comments = [];
+    video.comments.push(comment);
+    video.commentsCount = (video.commentsCount || 0) + 1;
+    this.persist();
+    return comment;
+  }
+
+  public deleteShortVideo(videoId: string, userId: string, isAdmin = false): boolean {
+    const index = this.data.shortVideos.findIndex((v) => v.id === videoId);
+    if (index === -1) return false;
+    const video = this.data.shortVideos[index];
+    if (video.userId !== userId && !isAdmin) return false;
+    this.data.shortVideos.splice(index, 1);
+    this.persist();
+    return true;
+  }
+
 
   // --- Conversations & Messages ---
   public getUserConversations(userId: string): Conversation[] {

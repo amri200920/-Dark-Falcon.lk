@@ -1,7 +1,7 @@
-import React from 'react';
+﻿import React from 'react';
 
 interface BrandLogoProps {
-  variant?: 'full' | 'compact' | 'emblem';
+  variant?: 'full' | 'compact' | 'emblem' | 'mobile';
   className?: string;
   glow?: boolean;
 }
@@ -29,10 +29,11 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
     );
   }
 
-  if (variant === 'compact') {
+  // Optimized responsive compact mobile header branding
+  if (variant === 'compact' || variant === 'mobile') {
     return (
-      <div className={`flex items-center gap-2.5 select-none ${className}`}>
-        <div className="relative h-9 w-9 overflow-hidden rounded-xl bg-slate-900 border border-falcon-blue/40 shadow-sm flex items-center justify-center">
+      <div className={`flex items-center gap-2 select-none ${className}`}>
+        <div className="relative h-7 w-7 sm:h-8 sm:w-8 overflow-hidden rounded-lg bg-slate-900 border border-falcon-blue/40 shadow-sm flex items-center justify-center shrink-0">
           <img
             src={emblemSrc}
             alt="Dark Falcon Logo"
@@ -40,10 +41,12 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           />
         </div>
         <div className="flex flex-col">
-          <span className="font-extrabold tracking-wider text-base text-white flex items-center gap-1">
-            DARK FALCON <span className="text-falcon-blue text-xs">🦅</span>
+          <span className="font-extrabold tracking-wide text-xs sm:text-sm text-white flex items-center gap-1 leading-none">
+            DARK FALCON <span className="text-falcon-blue text-[10px]">🦅</span>
           </span>
-          <span className="text-[10px] text-slate-400 tracking-tight">Connect. Create. Communicate.</span>
+          <span className="text-[9px] text-slate-400 tracking-tight leading-none mt-0.5 hidden xs:inline">
+            Connect. Create. Communicate.
+          </span>
         </div>
       </div>
     );

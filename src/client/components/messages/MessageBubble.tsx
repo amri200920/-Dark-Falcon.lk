@@ -62,7 +62,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     : message.content;
 
   return (
-    <div className={`group relative flex items-end gap-2 mb-3 select-none ${isSelf ? 'justify-end' : 'justify-start'}`}>
+    <div className={`group relative flex items-end gap-2 mb-3 select-none animate-message-in ${isSelf ? 'justify-end' : 'justify-start'}`}>
       {!isSelf && <Avatar src={message.senderAvatar} alt={message.senderUsername} size="xs" />}
 
       {/* Floating Action Menu (Hover) */}
