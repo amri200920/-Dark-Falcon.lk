@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { getMediaUrl } from '../../services/api';
 
 interface AvatarProps {
   src?: string;
@@ -15,6 +16,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   isOnline,
   className = '',
 }) => {
+  const [hasError, setHasError] = useState(false);
   const sizeStyles = {
     xs: 'w-6 h-6 text-[10px]',
     sm: 'w-8 h-8 text-xs',
@@ -34,20 +36,19 @@ export const Avatar: React.FC<AvatarProps> = ({
   };
 
   const fallback = alt ? alt.charAt(0).toUpperCase() : '🦅';
+  const resolvedSrc = getMediaUrl(src);
 
   return (
     <div className={`relative inline-block select-none shrink-0 ${className}`}>
       <div
         className={`${sizeStyles[size]} rounded-full overflow-hidden bg-[#121826] border border-[#1b2438] flex items-center justify-center font-bold text-slate-300 shadow-sm`}
       >
-        {src ? (
+        {resolvedSrc && !hasError ? (
           <img
-            src={src}
+            src={resolvedSrc}
             alt={alt}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = 'none';
-            }}
+            onError={() => setHasError(true)}
           />
         ) : (
           <span>{fallback}</span>

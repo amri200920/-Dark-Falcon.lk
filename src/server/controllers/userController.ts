@@ -195,7 +195,7 @@ export async function searchGlobal(req: AuthenticatedRequest, res: Response): Pr
 export async function getSystemConfig(req: AuthenticatedRequest, res: Response): Promise<void> {
   const status: SystemConfigStatus = {
     firebaseConfigured: isFirebaseConfigured,
-    geminiConfigured: isGeminiConfigured,
+    geminiConfigured: isGeminiConfigured(),
     stunTurnConfigured: Boolean(process.env.TURN_URL && process.env.TURN_USERNAME),
     sfuConfigured: Boolean(process.env.LIVEKIT_API_KEY && process.env.LIVEKIT_WS_URL),
     smsConfigured: Boolean(process.env.SMS_PROVIDER_API_KEY && process.env.SMS_PROVIDER_ACCOUNT_SID),

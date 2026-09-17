@@ -3,7 +3,7 @@ import { X, ChevronLeft, ChevronRight, Eye, Send, Volume2, VolumeX, Heart, Spark
 import { Story } from '../../../shared/types';
 import { getFilterCss } from '../../../shared/constants';
 import { Avatar } from '../common/Avatar';
-import { api } from '../../services/api';
+import { api, getMediaUrl } from '../../services/api';
 
 interface StoryViewerProps {
   stories: Story[];
@@ -171,7 +171,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
         <div className="relative flex-1 flex items-center justify-center overflow-hidden">
           {currentStory.mediaType === 'image' && (
             <img
-              src={currentStory.mediaUrl}
+              src={getMediaUrl(currentStory.mediaUrl)}
               alt="Story"
               className="w-full h-full object-cover"
               style={{ filter: getFilterCss(currentStory.filter) }}
@@ -181,7 +181,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
           {currentStory.mediaType === 'video' && (
             <video
               ref={videoRef}
-              src={currentStory.mediaUrl}
+              src={getMediaUrl(currentStory.mediaUrl)}
               autoPlay
               playsInline
               loop

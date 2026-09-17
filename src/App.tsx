@@ -24,7 +24,9 @@ import { PrivacyPolicyPage } from './client/pages/PrivacyPolicyPage';
 import { TermsOfServicePage } from './client/pages/TermsOfServicePage';
 import { DarkFalconAIChat } from './client/components/ai/DarkFalconAIChat';
 import { CreatePostModal } from './client/components/feed/CreatePostModal';
-import { Post, User } from './shared/types';
+import { CreateStoryModal } from './client/components/stories/CreateStoryModal';
+import { CreateReelModal } from './client/components/reels/CreateReelModal';
+import { Post, User, Story, ShortVideo } from './shared/types';
 import { RefreshCw } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -32,6 +34,8 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [authView, setAuthView] = useState<'landing' | 'login' | 'register' | 'tv' | 'help' | 'privacy' | 'terms'>('landing');
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+  const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
+  const [isCreateReelOpen, setIsCreateReelOpen] = useState(false);
   const [profileViewUsername, setProfileViewUsername] = useState<string | undefined>(undefined);
 
   // Deep-link / Hash Listener (#tv, #help, #privacy, #terms)
@@ -210,11 +214,36 @@ export const App: React.FC = () => {
       {currentTab === 'privacy-policy' && <PrivacyPolicyPage onBack={() => setCurrentTab('settings')} />}
       {currentTab === 'terms' && <TermsOfServicePage onBack={() => setCurrentTab('settings')} />}
 
-      {/* Global Post Creation Modal */}
+      {/* Global Creation Experience (Post, Story, Reel) */}
       <CreatePostModal
         isOpen={isCreatePostOpen}
         onClose={() => setIsCreatePostOpen(false)}
         onPostCreated={handlePostCreated}
+        onSwitchToStory={() => {
+          setIsCreatePostOpen(false);
+          setIsCreateStoryOpen(true);
+        }}
+        onSwitchToReel={() => {
+          setIsCreatePostOpen(false);
+          setIsCreateReelOpen(true);
+        }}
+      />
+
+      <CreateStoryModal
+        isOpen={isCreateStoryOpen}
+        onClose={() => setIsCreateStoryOpen(false)}
+        onStoryCreated={() => {
+          setIsCreateStoryOpen(false);
+        }}
+      />
+
+      <CreateReelModal
+        isOpen={isCreateReelOpen}
+        onClose={() => setIsCreateReelOpen(false)}
+        onReelCreated={() => {
+          setIsCreateReelOpen(false);
+          setCurrentTab('reels');
+        }}
       />
     </AppLayout>
   );

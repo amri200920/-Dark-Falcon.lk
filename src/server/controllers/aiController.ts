@@ -22,7 +22,7 @@ export async function askAI(req: AuthenticatedRequest, res: Response): Promise<v
       success: true,
       data: {
         text: answer,
-        isConfigured: isGeminiConfigured,
+        isConfigured: isGeminiConfigured(),
       },
     });
   } catch (err: any) {
@@ -33,13 +33,13 @@ export async function askAI(req: AuthenticatedRequest, res: Response): Promise<v
 export async function getCaptions(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { topic = 'Dark Falcon', tone = 'electric' } = req.body;
   const captions = await generateCaption(topic, tone);
-  res.json({ success: true, data: captions, isConfigured: isGeminiConfigured });
+  res.json({ success: true, data: captions, isConfigured: isGeminiConfigured() });
 }
 
 export async function getHashtags(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { topic = 'Dark Falcon' } = req.body;
   const hashtags = await generateHashtags(topic);
-  res.json({ success: true, data: hashtags, isConfigured: isGeminiConfigured });
+  res.json({ success: true, data: hashtags, isConfigured: isGeminiConfigured() });
 }
 
 export async function rewrite(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -49,7 +49,7 @@ export async function rewrite(req: AuthenticatedRequest, res: Response): Promise
     return;
   }
   const rewritten = await rewriteMessage(message, style);
-  res.json({ success: true, data: rewritten, isConfigured: isGeminiConfigured });
+  res.json({ success: true, data: rewritten, isConfigured: isGeminiConfigured() });
 }
 
 export async function summarize(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -59,5 +59,5 @@ export async function summarize(req: AuthenticatedRequest, res: Response): Promi
     return;
   }
   const summary = await summarizeContent(text);
-  res.json({ success: true, data: summary, isConfigured: isGeminiConfigured });
+  res.json({ success: true, data: summary, isConfigured: isGeminiConfigured() });
 }

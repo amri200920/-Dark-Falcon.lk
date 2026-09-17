@@ -79,16 +79,22 @@ import {
   createMeeting,
   getMeeting,
   joinMeeting,
+  getMeetings,
   getIceServers,
 } from '../controllers/callMeetingController';
 import {
   getCommunities,
   getCommunity,
   createCommunity,
+  joinCommunity,
+  leaveCommunity,
   getBroadcastChannels,
   getBroadcastChannel,
   createBroadcastChannel,
   createBroadcastPost,
+  subscribeChannel,
+  unsubscribeChannel,
+  reactBroadcastPost,
 } from '../controllers/communityChannelController';
 import {
   askAI,
@@ -185,10 +191,8 @@ router.post('/upload', requireAuth, upload.single('file'), (req, res) => {
     return;
   }
   // Build absolute URL so frontend on a different origin (Firebase Hosting) can load the file
-  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
-  const fileUrl = appUrl
-    ? `${appUrl}/uploads/${req.file.filename}`
-    : `/uploads/${req.file.filename}`;
+  const appUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const fileUrl = `${appUrl}/uploads/${req.file.filename}`;
 
   res.json({
     success: true,
@@ -265,6 +269,7 @@ router.post('/conversations/:id/lock', requireAuth, toggleLockConversation);
 // --- Calls & Meetings ---
 router.get('/calls/history', requireAuth, getCallLogs);
 router.get('/calls/ice-servers', requireAuth, getIceServers);
+router.get('/meetings', requireAuth, getMeetings);
 router.post('/meetings', requireAuth, createMeeting);
 router.get('/meetings/:code', requireAuth, getMeeting);
 router.post('/meetings/:code/join', requireAuth, joinMeeting);
@@ -273,10 +278,15 @@ router.post('/meetings/:code/join', requireAuth, joinMeeting);
 router.get('/communities', optionalAuth, getCommunities);
 router.get('/communities/:id', optionalAuth, getCommunity);
 router.post('/communities', requireAuth, createCommunity);
+router.post('/communities/:id/join', requireAuth, joinCommunity);
+router.post('/communities/:id/leave', requireAuth, leaveCommunity);
 router.get('/channels', optionalAuth, getBroadcastChannels);
 router.get('/channels/:id', optionalAuth, getBroadcastChannel);
 router.post('/channels', requireAuth, createBroadcastChannel);
 router.post('/channels/:id/posts', requireAuth, createBroadcastPost);
+router.post('/channels/:id/subscribe', requireAuth, subscribeChannel);
+router.post('/channels/:id/unsubscribe', requireAuth, unsubscribeChannel);
+router.post('/channels/:id/posts/:postId/react', requireAuth, reactBroadcastPost);
 
 // --- Dark Falcon AI 🦅 ---
 router.post('/ai/chat', requireAuth, aiRateLimiter, askAI);

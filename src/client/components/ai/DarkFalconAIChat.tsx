@@ -47,11 +47,17 @@ export const DarkFalconAIChat: React.FC = () => {
         setIsConfigured(res.data.isConfigured !== false);
       }
     } catch (err: any) {
+      const errorMsg = err.message || 'API connection unavailable';
+      const isAuthError = err?.status === 401 || err?.code === 'AUTH_REQUIRED' || err?.code === 'USER_NOT_FOUND';
+      const detail = isAuthError
+        ? `${errorMsg} Please sign in to authenticate your neural session.`
+        : errorMsg;
+
       setMessages((prev) => [
         ...prev,
         {
           role: 'model',
-          text: `⚠️ **Falcon Neural Link Alert**: ${err.message || 'API connection unavailable'}. Please verify server .env GEMINI_API_KEY configuration.`,
+          text: `⚠️ **Falcon Neural Link Notice**: ${detail}`,
         },
       ]);
     } finally {

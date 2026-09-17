@@ -2,138 +2,147 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { db } from '../services/dbService';
 import { User, UserRole } from '../../shared/types';
+import { verifyFirebaseIdToken } from '../services/firebaseAdminService';
 
 export interface AuthenticatedRequest extends Request {
-user?: User;
+  user?: User;
 }
 
 const JWT_SECRET =
-process.env.JWT_SECRET ||
-'dark_falcon_ultra_secure_jwt_secret_key_2026_change_in_prod';
+  process.env.JWT_SECRET ||
+  'dark_falcon_ultra_secure_jwt_secret_key_2026_change_in_prod';
 
 export function signToken(user: User): string {
-return jwt.sign(
-{
-id: user.id,
-username: user.username,
-email: user.email,
-displayName: user.displayName,
-avatarUrl: user.avatarUrl,
-role: user.role,
-tokenVersion: user.tokenVersion || 1,
-},
-JWT_SECRET,
-{ expiresIn: '7d' }
-);
+  return jwt.sign(
+    {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
+      tokenVersion: user.tokenVersion || 1,
+    },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
 }
 
 export function requireAuth(
-req: AuthenticatedRequest,
-res: Response,
-next: NextFunction
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
 ): void {
-const authHeader = req.headers.authorization;
+  const authHeader = req.headers.authorization;
 
-if (!authHeader || !authHeader.startsWith('Bearer ')) {
-res.status(401).json({
-success: false,
-error: 'Unauthorized',
-code: 'AUTH_REQUIRED',
-message: 'Authentication token is required to access this resource.',
-});
-return;
-}
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({
+      success: false,
+      error: 'Unauthorized',
+      code: 'AUTH_REQUIRED',
+      message: 'Authentication token is required to access this resource.',
+    });
+    return;
+  }
 
-const token = authHeader.split(' ')[1];
+  const token = authHeader.split(' ')[1];
 
-try {
-const decoded = jwt.verify(token, JWT_SECRET) as {
-id: string;
-username: string;
-email?: string;
-displayName?: string;
-avatarUrl?: string;
-role: UserRole;
-tokenVersion?: number;
-};
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      id: string;
+      username: string;
+      email?: string;
+      displayName?: string;
+      avatarUrl?: string;
+      role: UserRole;
+      tokenVersion?: number;
+    };
 
-const user = db.findUserById(decoded.id);
+    let user =
+      db.findUserById(decoded.id) ||
+      (decoded.username ? db.findUserByUsername(decoded.username) : undefined) ||
+      (decoded.email ? db.findUserByEmail(decoded.email) : undefined);
 
-console.log('🦅 AUTH DEBUG:', {
-  userId: decoded.id,
-  username: decoded.username,
-  email: decoded.email,
-  userFound: Boolean(user),
-  tokenVersion: decoded.tokenVersion,
-});
+    // Auto-restore user from verified JWT if server re-seeded or container restarted
+    if (!user && decoded.id && decoded.username) {
+      const restoredUser: User = {
+        id: decoded.id,
+        username: decoded.username,
+        email: decoded.email || `${decoded.username}@darkfalcon.io`,
+        displayName: decoded.displayName || decoded.username,
+        avatarUrl: decoded.avatarUrl || '/assets/brand/dark-falcon-logo.png',
+        role: decoded.role || 'user',
+        isVerified: false,
+        isPrivate: false,
+        followersCount: 0,
+        followingCount: 0,
+        postsCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isOnline: true,
+        tokenVersion: decoded.tokenVersion || 1,
+      };
+      db.createUser(restoredUser, '');
+      user = restoredUser;
+      console.log('🦅 AUTH: Seamlessly restored authenticated user from verified JWT:', user.id, user.username);
+    }
 
-if (!user) {
-  console.warn(
-    '🦅 AUTH DEBUG: User missing from database for valid JWT:',
-    decoded.id
-  );
+    if (!user) {
+      console.warn('🦅 AUTH DEBUG: User missing from database for valid JWT:', decoded.id);
+      res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+        code: 'USER_NOT_FOUND',
+        message: 'Authenticated user could not be found. Please sign in again.',
+      });
+      return;
+    }
 
-  res.status(401).json({
-    success: false,
-    error: 'Unauthorized',
-    code: 'USER_NOT_FOUND',
-    message:
-      'Authenticated user could not be found. Please sign in again.',
-  });
-  return;
-}
+    if (user.isBanned) {
+      res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        code: 'ACCOUNT_BANNED',
+        message: 'This account has been banned due to violations of Dark Falcon community rules.',
+      });
+      return;
+    }
 
-if (user.isBanned) {
-  res.status(403).json({
-    success: false,
-    error: 'Forbidden',
-    code: 'ACCOUNT_BANNED',
-    message:
-      'This account has been banned due to violations of Dark Falcon community rules.',
-  });
-  return;
-}
+    if (user.isSuspended) {
+      res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'This account is currently suspended.',
+      });
+      return;
+    }
 
-if (user.isSuspended) {
-  res.status(403).json({
-    success: false,
-    error: 'Forbidden',
-    code: 'ACCOUNT_SUSPENDED',
-    message: 'This account is currently suspended.',
-  });
-  return;
-}
+    if (
+      decoded.tokenVersion !== undefined &&
+      user.tokenVersion !== undefined &&
+      decoded.tokenVersion < user.tokenVersion
+    ) {
+      res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+        code: 'TOKEN_REVOKED',
+        message: 'This session has been revoked or password was changed. Please sign in again.',
+      });
+      return;
+    }
 
-if (
-  decoded.tokenVersion !== undefined &&
-  user.tokenVersion !== undefined &&
-  decoded.tokenVersion < user.tokenVersion
-) {
-  res.status(401).json({
-    success: false,
-    error: 'Unauthorized',
-    code: 'TOKEN_REVOKED',
-    message:
-      'This session has been revoked or password was changed. Please sign in again.',
-  });
-  return;
-}
-
-req.user = user;
-next();
-
-} catch (err) {
-console.error('🦅 AUTH DEBUG: JWT verification failed:', err);
-
-res.status(401).json({
-  success: false,
-  error: 'Unauthorized',
-  code: 'INVALID_TOKEN',
-  message:
-    'Session has expired or token is invalid. Please log in again.',
-});
-
-}
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error('🦅 AUTH DEBUG: Token verification failed:', err);
+    res.status(401).json({
+      success: false,
+      error: 'Unauthorized',
+      code: 'INVALID_TOKEN',
+      message: 'Session has expired or token is invalid. Please log in again.',
+    });
+  }
 }
 
 export function optionalAuth(

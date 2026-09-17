@@ -123,3 +123,81 @@ export async function createBroadcastPost(req: AuthenticatedRequest, res: Respon
 
   res.status(201).json({ success: true, data: post });
 }
+
+export async function joinCommunity(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const community = db.getCommunityById(id);
+  if (!community) {
+    res.status(404).json({ success: false, message: 'Community not found.' });
+    return;
+  }
+  community.membersCount = (community.membersCount || 0) + 1;
+  db.persist();
+  res.json({ success: true, data: { joined: true, membersCount: community.membersCount } });
+}
+
+export async function leaveCommunity(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const community = db.getCommunityById(id);
+  if (!community) {
+    res.status(404).json({ success: false, message: 'Community not found.' });
+    return;
+  }
+  community.membersCount = Math.max(1, (community.membersCount || 1) - 1);
+  db.persist();
+  res.json({ success: true, data: { joined: false, membersCount: community.membersCount } });
+}
+
+export async function subscribeChannel(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const channel = db.getBroadcastChannelById(id);
+  if (!channel) {
+    res.status(404).json({ success: false, message: 'Broadcast channel not found.' });
+    return;
+  }
+  channel.subscribersCount = (channel.subscribersCount || 0) + 1;
+  db.persist();
+  res.json({ success: true, data: { subscribed: true, subscribersCount: channel.subscribersCount } });
+}
+
+export async function unsubscribeChannel(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+  const channel = db.getBroadcastChannelById(id);
+  if (!channel) {
+    res.status(404).json({ success: false, message: 'Broadcast channel not found.' });
+    return;
+  }
+  channel.subscribersCount = Math.max(1, (channel.subscribersCount || 1) - 1);
+  db.persist();
+  res.json({ success: true, data: { subscribed: false, subscribersCount: channel.subscribersCount } });
+}
+
+export async function reactBroadcastPost(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { id, postId } = req.params;
+  const channel = db.getBroadcastChannelById(id);
+  if (!channel) {
+    res.status(404).json({ success: false, message: 'Broadcast channel not found.' });
+    return;
+  }
+  const post = channel.posts.find((p) => p.id === postId);
+  if (!post) {
+    res.status(404).json({ success: false, message: 'Post not found in channel.' });
+    return;
+  }
+  if (!post.reactions) post.reactions = [];
+  const user = req.user!;
+  const existing = post.reactions.find((r) => r.userId === user.id);
+  if (existing) {
+    post.reactions = post.reactions.filter((r) => r.userId !== user.id);
+  } else {
+    post.reactions.push({
+      userId: user.id,
+      username: user.username,
+      type: 'love',
+      emoji: '❤️',
+      createdAt: new Date().toISOString(),
+    });
+  }
+  db.persist();
+  res.json({ success: true, data: { reactions: post.reactions } });
+}

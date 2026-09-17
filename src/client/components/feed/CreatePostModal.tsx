@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Image, Sparkles, Globe, Users, Lock, X, Hash } from 'lucide-react';
+import { Image, Sparkles, Globe, Users, Lock, X, Hash, MapPin, Zap, Film, FileText } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Avatar } from '../common/Avatar';
@@ -11,18 +11,24 @@ interface CreatePostModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPostCreated: (post: Post) => void;
+  onSwitchToStory?: () => void;
+  onSwitchToReel?: () => void;
 }
 
 export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   isOpen,
   onClose,
   onPostCreated,
+  onSwitchToStory,
+  onSwitchToReel,
 }) => {
   const { user } = useAuth();
   const [content, setContent] = useState('');
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   const [privacy, setPrivacy] = useState<PostPrivacy>('public');
+  const [location, setLocation] = useState('');
+  const [showLocation, setShowLocation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAILoading, setIsAILoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -110,38 +116,93 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create Dark Falcon Post" maxWidth="lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Author preview & privacy dropdown */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Avatar src={user?.avatarUrl} alt={user?.displayName} size="sm" />
-            <div>
-              <p className="text-xs font-bold text-white">{user?.displayName}</p>
-              <p className="text-[11px] text-slate-400">@{user?.username}</p>
+    <Modal isOpen={isOpen} onClose={onClose} title="Dark Falcon Creation Studio 🦅" maxWidth="lg">
+      <div className="space-y-4">
+        {/* Format Selector: Post | Story | Reel */}
+        {(onSwitchToStory || onSwitchToReel) && (
+          <div className="flex items-center gap-1 p-1 bg-[#090d15] border border-[#1b2438] rounded-2xl">
+            <button
+              type="button"
+              className="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-falcon-blue text-white shadow-neon-blue flex items-center justify-center gap-1.5"
+            >
+              <FileText className="w-3.5 h-3.5" /> Post
+            </button>
+            {onSwitchToStory && (
+              <button
+                type="button"
+                onClick={onSwitchToStory}
+                className="flex-1 py-2 px-3 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" /> Story
+              </button>
+            )}
+            {onSwitchToReel && (
+              <button
+                type="button"
+                onClick={onSwitchToReel}
+                className="flex-1 py-2 px-3 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5"
+              >
+                <Film className="w-3.5 h-3.5 text-purple-400" /> Reel
+              </button>
+            )}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Author preview & privacy dropdown */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Avatar src={user?.avatarUrl} alt={user?.displayName} size="sm" />
+              <div>
+                <p className="text-xs font-bold text-white">{user?.displayName}</p>
+                <p className="text-[11px] text-slate-400">@{user?.username}</p>
+              </div>
             </div>
+
+            <select
+              value={privacy}
+              onChange={(e) => setPrivacy(e.target.value as PostPrivacy)}
+              className="bg-[#090d15] text-xs text-slate-300 border border-[#1b2438] rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-falcon-blue"
+            >
+              <option value="public">🌐 Public</option>
+              <option value="followers">👥 Followers</option>
+              <option value="close_friends">⭐ Close Friends</option>
+              <option value="only_me">🔒 Only Me</option>
+            </select>
           </div>
 
-          <select
-            value={privacy}
-            onChange={(e) => setPrivacy(e.target.value as PostPrivacy)}
-            className="bg-[#090d15] text-xs text-slate-300 border border-[#1b2438] rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-falcon-blue"
-          >
-            <option value="public">🌐 Public</option>
-            <option value="followers">👥 Followers</option>
-            <option value="close_friends">⭐ Close Friends</option>
-            <option value="only_me">🔒 Only Me</option>
-          </select>
-        </div>
+          {/* Text Area */}
+          <textarea
+            rows={4}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="What's happening across the digital skies? Type #hashtags and @mentions..."
+            className="w-full bg-[#090d15] border border-[#1b2438] rounded-xl p-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-falcon-blue resize-none"
+          />
 
-        {/* Text Area */}
-        <textarea
-          rows={4}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="What's happening across the digital skies? Type #hashtags and @mentions..."
-          className="w-full bg-[#090d15] border border-[#1b2438] rounded-xl p-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-falcon-blue resize-none"
-        />
+          {/* Optional Location Input */}
+          {showLocation && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-[#090d15] border border-[#1b2438] rounded-xl text-xs">
+              <MapPin className="w-3.5 h-3.5 text-falcon-blue shrink-0" />
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Add location (e.g. Neo Tokyo, Global Mesh HQ)..."
+                className="flex-1 bg-transparent text-slate-200 placeholder:text-slate-500 focus:outline-none text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setLocation('');
+                  setShowLocation(false);
+                }}
+                className="text-slate-500 hover:text-white"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
         {/* Media Previews Grid */}
         {mediaPreviews.length > 0 && (
@@ -200,13 +261,23 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             onChange={handleMediaSelect}
             className="hidden"
           />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-falcon-blue transition-colors px-2 py-1"
-          >
-            <Image className="w-4 h-4" /> Add Photos/Videos {mediaFiles.length > 0 && `(${mediaFiles.length})`}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-falcon-blue transition-colors px-2 py-1"
+            >
+              <Image className="w-4 h-4" /> Add Photos/Videos {mediaFiles.length > 0 && `(${mediaFiles.length})`}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowLocation(!showLocation)}
+              className="flex items-center gap-1 text-xs text-slate-400 hover:text-falcon-blue transition-colors px-2 py-1"
+            >
+              <MapPin className="w-3.5 h-3.5" /> {location ? location : 'Location'}
+            </button>
+          </div>
 
           <Button
             type="submit"
@@ -217,7 +288,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
             Publish Post
           </Button>
         </div>
-      </form>
+        </form>
+      </div>
     </Modal>
   );
 };

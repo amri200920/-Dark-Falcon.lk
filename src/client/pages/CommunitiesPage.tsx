@@ -58,8 +58,18 @@ export const CommunitiesPage: React.FC = () => {
     }
   };
 
-  const toggleJoin = (id: string) => {
-    setJoinedMap((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleJoin = async (id: string) => {
+    const nextState = !joinedMap[id];
+    setJoinedMap((prev) => ({ ...prev, [id]: nextState }));
+    try {
+      if (nextState) {
+        await api.post(`/communities/${id}/join`);
+      } else {
+        await api.post(`/communities/${id}/leave`);
+      }
+    } catch (e) {
+      console.warn('Failed to toggle community membership:', e);
+    }
   };
 
   return (

@@ -58,8 +58,18 @@ export const ChannelsPage: React.FC = () => {
     }
   };
 
-  const toggleSubscribe = (id: string) => {
-    setSubscribedMap((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleSubscribe = async (id: string) => {
+    const nextState = !subscribedMap[id];
+    setSubscribedMap((prev) => ({ ...prev, [id]: nextState }));
+    try {
+      if (nextState) {
+        await api.post(`/channels/${id}/subscribe`);
+      } else {
+        await api.post(`/channels/${id}/unsubscribe`);
+      }
+    } catch (e) {
+      console.warn('Failed to toggle channel subscription:', e);
+    }
   };
 
   return (
@@ -167,11 +177,21 @@ export const ChannelsPage: React.FC = () => {
                     <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-[#1b2438]">
                       <span>{new Date(post.createdAt).toLocaleDateString()}</span>
                       <button
-                        onClick={() => alert('Reacted to broadcast ❤️')}
-                        className="flex items-center gap-1 hover:text-red-400"
+                        onClick={async () => {
+                          try {
+                            const res = await api.post(`/channels/${selectedChannel.id}/posts/${post.id}/react`);
+                            if (res.success && res.data?.reactions) {
+                              post.reactions = res.data.reactions;
+                              setSelectedChannel({ ...selectedChannel });
+                            }
+                          } catch (e) {
+                            console.warn('Failed to react to broadcast post:', e);
+                          }
+                        }}
+                        className="flex items-center gap-1 hover:text-red-400 text-slate-300"
                       >
-                        <Heart className="w-3.5 h-3.5" />
-                        <span>{post.reactions?.length || 1}</span>
+                        <Heart className={`w-3.5 h-3.5 ${post.reactions && post.reactions.length > 0 ? 'fill-red-500 text-red-500' : ''}`} />
+                        <span>{post.reactions?.length || 0}</span>
                       </button>
                     </div>
                   </div>

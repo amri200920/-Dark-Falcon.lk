@@ -4,7 +4,7 @@ import { ShortVideo, Comment } from '../../../shared/types';
 import { Avatar } from '../common/Avatar';
 import { Badge } from '../common/Badge';
 import { Modal } from '../common/Modal';
-import { api } from '../../services/api';
+import { api, getMediaUrl } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ShortVideoPlayerProps {
@@ -161,7 +161,7 @@ export const ShortVideoPlayer: React.FC<ShortVideoPlayerProps> = ({ videos }) =>
             {/* Background Video */}
             <video
               ref={(el) => (videoRefs.current[idx] = el)}
-              src={video.videoUrl}
+              src={getMediaUrl(video.videoUrl)}
               loop
               playsInline
               muted={isMuted}

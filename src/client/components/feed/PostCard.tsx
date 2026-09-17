@@ -28,7 +28,7 @@ import { Button } from '../common/Button';
 import { ReactionPicker } from './ReactionPicker';
 import { CommentSection } from './CommentSection';
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../services/api';
+import { api, getMediaUrl } from '../../services/api';
 
 interface PostCardProps {
   post: Post;
@@ -347,14 +347,14 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onPostDeleted, onPostU
         <div className="relative rounded-xl overflow-hidden border border-[#1b2438] mb-3 bg-black max-h-[480px] flex items-center justify-center">
           {currentPost.mediaUrls[activeMediaIdx].endsWith('.mp4') ? (
             <video
-              src={currentPost.mediaUrls[activeMediaIdx]}
+              src={getMediaUrl(currentPost.mediaUrls[activeMediaIdx])}
               controls
               playsInline
               className="w-full max-h-[480px] object-contain"
             />
           ) : (
             <img
-              src={currentPost.mediaUrls[activeMediaIdx]}
+              src={getMediaUrl(currentPost.mediaUrls[activeMediaIdx])}
               alt={`Attachment ${activeMediaIdx + 1}`}
               className="w-full max-h-[480px] object-cover"
               loading="lazy"

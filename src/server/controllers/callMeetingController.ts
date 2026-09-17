@@ -86,6 +86,11 @@ export async function joinMeeting(req: AuthenticatedRequest, res: Response): Pro
   res.json({ success: true, data: meeting });
 }
 
+export async function getMeetings(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const meetings = db.getAllMeetings();
+  res.json({ success: true, data: meetings });
+}
+
 export async function getIceServers(req: AuthenticatedRequest, res: Response): Promise<void> {
   // Return STUN & configured TURN servers
   const iceServers = [

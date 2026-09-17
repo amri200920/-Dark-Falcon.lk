@@ -11,6 +11,30 @@ const getApiBaseUrl = (): string => {
 
 const API_BASE = getApiBaseUrl();
 
+/**
+ * Resolves media URLs (e.g. `/uploads/image.jpg`) to the full backend origin
+ * so that assets hosted on the backend load properly from Firebase Hosting.
+ */
+export function getMediaUrl(url?: string): string {
+  if (!url) return '';
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:')
+  ) {
+    return url;
+  }
+  if (url.startsWith('/uploads')) {
+    const backendOrigin = (import.meta.env.VITE_API_BASE_URL || '')
+      .trim()
+      .replace(/\/$/, '')
+      .replace(/\/api$/, '');
+    return backendOrigin ? `${backendOrigin}${url}` : url;
+  }
+  return url;
+}
+
 export class ApiError extends Error {
   public code?: string;
   public status?: number;
@@ -37,7 +61,16 @@ export async function request<T = any>(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  // Prevent accidental /api/api duplicate prefix
+  let cleanEndpoint = endpoint;
+  if (API_BASE.endsWith('/api') && cleanEndpoint.startsWith('/api/')) {
+    cleanEndpoint = cleanEndpoint.substring(4);
+  }
+  if (!cleanEndpoint.startsWith('/')) {
+    cleanEndpoint = `/${cleanEndpoint}`;
+  }
+
+  const response = await fetch(`${API_BASE}${cleanEndpoint}`, {
     ...options,
     headers,
   });

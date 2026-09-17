@@ -1,18 +1,28 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const apiKey = process.env.GEMINI_API_KEY || '';
-let genAI: GoogleGenerativeAI | null = null;
+let genAIInstance: GoogleGenerativeAI | null = null;
 
-if (apiKey && apiKey !== 'your_gemini_api_key_here') {
-  try {
-    genAI = new GoogleGenerativeAI(apiKey);
-    console.log('🦅 Dark Falcon AI: Gemini Engine initialized successfully.');
-  } catch (err) {
-    console.warn('⚠️ Gemini initialization error:', err);
+function getGenAI(): GoogleGenerativeAI | null {
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+    return null;
   }
+  if (!genAIInstance) {
+    try {
+      genAIInstance = new GoogleGenerativeAI(apiKey);
+      console.log('🦅 Dark Falcon AI: Gemini Engine initialized successfully.');
+    } catch (err) {
+      console.warn('⚠️ Gemini initialization error:', err);
+      return null;
+    }
+  }
+  return genAIInstance;
 }
 
-export const isGeminiConfigured = Boolean(apiKey && apiKey !== 'your_gemini_api_key_here');
+export function isGeminiConfigured(): boolean {
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  return Boolean(apiKey && apiKey !== 'your_gemini_api_key_here');
+}
 
 const DARK_FALCON_SYSTEM_PROMPT = `
 You are Dark Falcon AI 🦅, the sovereign cognitive assistant embedded directly within Dark Falcon platform.
@@ -23,38 +33,48 @@ Format your responses with clean Markdown.
 `;
 
 export async function askGemini(prompt: string, conversationHistory: { role: 'user' | 'model'; text: string }[] = []): Promise<string> {
-  if (!genAI) {
+  const client = getGenAI();
+  if (!client) {
     return `[Dark Falcon AI 🦅 — Configuration Notice]
 Gemini API key is not currently configured on the server.
-To activate live neural intelligence, add your \`GEMINI_API_KEY\` to the \`.env\` file and restart the server.
+To activate live neural intelligence, configure your \`GEMINI_API_KEY\` on the server environment.
 
 In the meantime, Dark Falcon AI stands ready! Your query was: "${prompt.slice(0, 80)}..."`;
   }
 
-  try {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3.6-flash',
-      systemInstruction: DARK_FALCON_SYSTEM_PROMPT,
-    });
+  const modelCandidates = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  let lastError: any = null;
 
-    const chat = model.startChat({
-      history: conversationHistory.map((h) => ({
-        role: h.role,
-        parts: [{ text: h.text }],
-      })),
-    });
+  for (const modelName of modelCandidates) {
+    try {
+      const model = client.getGenerativeModel({
+        model: modelName,
+        systemInstruction: DARK_FALCON_SYSTEM_PROMPT,
+      });
 
-    const result = await chat.sendMessage(prompt);
-    const response = await result.response;
-    return response.text();
-  } catch (error: any) {
-    console.error('Gemini API call failed:', error);
-    return `⚠️ Dark Falcon AI encountered a connection interruption: ${error.message || 'Unknown error'}. Please verify API quota and connectivity.`;
+      const chat = model.startChat({
+        history: conversationHistory.map((h) => ({
+          role: h.role,
+          parts: [{ text: h.text }],
+        })),
+      });
+
+      const result = await chat.sendMessage(prompt);
+      const response = await result.response;
+      return response.text();
+    } catch (error: any) {
+      lastError = error;
+      // If model not found or rate limit, try the next candidate
+      console.warn(`Falcon AI: Model ${modelName} call failed, trying next candidate:`, error.message);
+    }
   }
+
+  console.error('Gemini API call failed across all candidates:', lastError);
+  return `⚠️ Dark Falcon AI encountered a service notice: ${lastError?.message || 'Neural link unavailable'}. Please verify server API quota.`;
 }
 
 export async function generateCaption(topic: string, tone: string = 'electric'): Promise<string[]> {
-  if (!genAI) {
+  if (!getGenAI()) {
     return [
       `Soaring through the digital skyline with Dark Falcon 🦅⚡ #${topic.replace(/\s+/g, '')} #DarkFalcon`,
       `Unstoppable momentum. Connect. Create. Communicate. 🦅 #${topic.replace(/\s+/g, '')}`,
@@ -68,7 +88,7 @@ export async function generateCaption(topic: string, tone: string = 'electric'):
 }
 
 export async function generateHashtags(topic: string): Promise<string[]> {
-  if (!genAI) {
+  if (!getGenAI()) {
     const tag = topic.replace(/[^a-zA-Z0-9]/g, '');
     return [`#DarkFalcon`, `#ConnectCreateCommunicate`, `#${tag}`, `#FalconHQ`, `#SovereignNet`, `#NextGen`];
   }
@@ -80,7 +100,7 @@ export async function generateHashtags(topic: string): Promise<string[]> {
 }
 
 export async function rewriteMessage(message: string, style: 'punchy' | 'formal' | 'cyberpunk' | 'friendly'): Promise<string> {
-  if (!genAI) {
+  if (!getGenAI()) {
     return `🦅 [Dark Falcon ${style.toUpperCase()} Rewrite]: ${message}`;
   }
 
@@ -89,7 +109,7 @@ export async function rewriteMessage(message: string, style: 'punchy' | 'formal'
 }
 
 export async function summarizeContent(text: string): Promise<string> {
-  if (!genAI) {
+  if (!getGenAI()) {
     return `🦅 Quick Falcon Summary: ${text.slice(0, 150)}...`;
   }
   const prompt = `Provide a concise bulleted summary of this content in 3 bullet points with an executive takeaway:\n"${text}"`;
